@@ -1587,6 +1587,101 @@ function makeThreatZone(type, starR){
   g.add(glow,wire); g.userData={glow,wire};
   return g;
 }
+function makeInterstellarBH(r){
+  const group=new THREE.Group();
+  const diskInner=r*1.5, diskOuter=r*4.2;
+
+  function diskTexture(){
+    const w=512,h=128,c=document.createElement('canvas'); c.width=w; c.height=h;
+    const x=c.getContext('2d');
+    for(let i=0;i<w;i++){
+      const rad=i/w;
+      const heat=1-rad;
+      const rC=255, gC=Math.round(150+105*heat), bC=Math.round(60+120*heat*heat);
+      const a=Math.pow(1-Math.abs(rad-0.18)/0.82,1.4);
+      const col=x.createLinearGradient(0,0,0,h);
+      col.addColorStop(0,'rgba(0,0,0,0)');
+      col.addColorStop(0.5,'rgba('+rC+','+gC+','+bC+','+Math.max(0,a)+')');
+      col.addColorStop(1,'rgba(0,0,0,0)');
+      x.fillStyle=col; x.fillRect(i,0,1,h);
+    }
+    const rnd=seededRandom(1701);
+    x.globalCompositeOperation='overlay';
+    for(let k=0;k<140;k++){
+      const px=rnd()*w, pw=4+rnd()*40;
+      x.fillStyle='rgba(255,'+(200+rnd()*55|0)+',150,'+(0.05+rnd()*0.12)+')';
+      x.fillRect(px,0,pw,h);
+    }
+    const tex=new THREE.CanvasTexture(c);
+    tex.wrapS=THREE.RepeatWrapping;
+    return tex;
+  }
+  const diskTex=diskTexture();
+
+  const diskMat=new THREE.ShaderMaterial({
+    uniforms:{ tDisk:{value:diskTex}, uTime:{value:0} },
+    transparent:true, side:THREE.DoubleSide, depthWrite:false,
+    blending:THREE.AdditiveBlending,
+    vertexShader:[
+      'varying vec2 vUv; varying float vAng;',
+      'void main(){',
+      '  vUv=uv;',
+      '  vAng=atan(position.y,position.x);',
+      '  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);',
+      '}'].join('\n'),
+    fragmentShader:[
+      'uniform sampler2D tDisk; uniform float uTime; varying vec2 vUv; varying float vAng;',
+      'void main(){',
+      '  float rad=vUv.x;',
+      '  float spin=uTime*0.6;',
+      '  float u=fract(vAng/6.2831853 + spin);',
+      '  vec4 c=texture2D(tDisk, vec2(rad, u));',
+      '  float doppler=0.45+0.55*(0.5+0.5*sin(vAng+1.5708));',
+      '  c.rgb*=doppler*1.6;',
+      '  c.a*=smoothstep(0.0,0.08,rad)*smoothstep(1.0,0.85,rad);',
+      '  gl_FragColor=c;',
+      '}'].join('\n')
+  });
+  const diskGeo=new THREE.RingGeometry(diskInner,diskOuter,128,1);
+  const uv=diskGeo.attributes.uv, pos=diskGeo.attributes.position;
+  for(let i=0;i<uv.count;i++){
+    const px=pos.getX(i), py=pos.getY(i);
+    const rr=(Math.hypot(px,py)-diskInner)/(diskOuter-diskInner);
+    uv.setX(i, rr); uv.setY(i, 0.5);
+  }
+  uv.needsUpdate=true;
+  const disk=new THREE.Mesh(diskGeo,diskMat); disk.raycast=()=>{};
+  disk.rotation.x=Math.PI*0.5 - 0.32;
+  group.add(disk);
+
+  function lensArc(flip){
+    const arcGeo=new THREE.RingGeometry(r*1.08,r*1.5,96,1,0,Math.PI);
+    const m=new THREE.MeshBasicMaterial({map:diskTex,transparent:true,side:THREE.DoubleSide,
+      opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
+    const a=new THREE.Mesh(arcGeo,m); a.raycast=()=>{};
+    a.rotation.x=Math.PI/2;
+    if(flip) a.rotation.z=Math.PI;
+    return a;
+  }
+  const topArc=lensArc(false), botArc=lensArc(true);
+  group.add(topArc, botArc);
+
+  const photonRing=new THREE.Mesh(new THREE.TorusGeometry(r*1.06,r*0.025,16,128),
+    new THREE.MeshBasicMaterial({color:0xffe6b0,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+  photonRing.raycast=()=>{};
+  group.add(photonRing);
+
+  const shadow=new THREE.Mesh(new THREE.SphereGeometry(r*1.02,32,32),
+    new THREE.MeshBasicMaterial({color:0x000000}));
+  shadow.raycast=()=>{}; group.add(shadow);
+
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,color:0xffb870,
+    transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false}));
+  glow.scale.setScalar(r*9); glow.raycast=()=>{}; group.add(glow);
+
+  return {group,diskMat,photonRing,topArc,botArc,glow};
+}
+
 function makeShipyard(orbR){
   const g=new THREE.Group(); g.rotation.x=Math.PI/6;
   const scaffold=new THREE.Mesh(new THREE.TorusGeometry(orbR,0.04,8,64),
@@ -1618,18 +1713,20 @@ SYSTEMS.forEach(sys=>{
   if(!isBlackHole) core.material.color.set(sys.color).lerp(new THREE.Color(0xffffff),0.55);
   group.add(core);
 
-  const halo=new THREE.Sprite(new THREE.SpriteMaterial({
-    map:haloTex,color:new THREE.Color(isBlackHole?0xff7733:sys.color),transparent:true,
-    opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));
-  halo.scale.setScalar(r*7);
-  halo.raycast=()=>{};
-  group.add(halo);
-
+  let blackHole=null;
   if(isBlackHole){
-    const rim=new THREE.Mesh(new THREE.SphereGeometry(r*1.15,32,32),
-      new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false}));
-    rim.raycast=()=>{}; group.add(rim);
+    blackHole=makeInterstellarBH(r);
+    group.add(blackHole.group);
+  } else {
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({
+      map:haloTex,color:new THREE.Color(sys.color),transparent:true,
+      opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+    halo.scale.setScalar(r*7);
+    halo.raycast=()=>{};
+    group.add(halo);
+    group.userData.halo=halo;
   }
+  const halo=group.userData.halo||{material:{color:new THREE.Color(0xffffff),opacity:0},scale:{setScalar(){}}};
 
   const pick=new THREE.Mesh(new THREE.SphereGeometry(Math.max(r*2.2,1.1),8,8),
     new THREE.MeshBasicMaterial({visible:false}));
@@ -1645,7 +1742,7 @@ SYSTEMS.forEach(sys=>{
 
   starsGroup.add(group);
   starRecords.push({system:sys,group,core,halo,pick,baseHalo:r*7,phase:Math.random()*6.28,
-    baseCore:core.material.color.getHex(),isNova:false});
+    baseCore:core.material.color.getHex(),isNova:false,blackHole});
 });
 
 /* selection reticle — rotating dashed diamond ring */
@@ -2631,6 +2728,16 @@ function animate(){
 
   // star twinkle
   starRecords.forEach(rec=>{
+    if(rec.blackHole){
+      rec.blackHole.diskMat.uniforms.uTime.value=t;
+      // billboard the photon ring + lensing arcs to face the camera
+      rec.blackHole.photonRing.lookAt(camera.position);
+      const q=camera.quaternion;
+      rec.blackHole.topArc.quaternion.copy(q);
+      rec.blackHole.botArc.quaternion.copy(q);
+      rec.blackHole.botArc.rotateZ(Math.PI);
+      return;
+    }
     if(rec.core.material.opacity>0.5){
       const k=1+Math.sin(t*1.6+rec.phase)*0.08;
       rec.halo.scale.setScalar(rec.baseHalo*(rec.isNova?2.6:1)*k);
