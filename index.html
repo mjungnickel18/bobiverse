@@ -24,7 +24,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--void);font-family:var(--mono);color:var(--ink)}
 #app{position:absolute;inset:0;z-index:1}
-#app canvas{display:block;cursor:crosshair}
+#app canvas{display:block;cursor:crosshair;touch-action:none}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+input,textarea{-webkit-user-select:text;user-select:text}
 #app.grabbing canvas{cursor:grabbing}
 
 /* ===== shared tactical-glass panel ===== */
@@ -175,7 +177,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--void);font-fam
 
 /* ===== sidebar / telemetry drawer ===== */
 #sidebar{
-  position:fixed;top:0;right:0;z-index:100;width:348px;max-width:92vw;height:100vh;
+  position:fixed;top:0;right:0;z-index:100;width:348px;max-width:92vw;height:100vh;height:100dvh;
   background:var(--panel);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   border-left:1px solid var(--line);box-shadow:-10px 0 50px rgba(0,0,0,.6);
   transform:translateX(105%);transition:transform .32s cubic-bezier(.22,.9,.3,1);
@@ -229,7 +231,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--void);font-fam
 .jump-hint{margin-top:6px;font-size:9px;letter-spacing:.18em;color:rgba(95,245,212,.45);text-transform:uppercase}
 
 @media (max-width:720px){
-  #hud-top{width:calc(100vw - 36px)}
+  #hud-top{width:calc(100vw - 96px)}
   #deck{width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center;gap:10px;padding:10px 12px;bottom:12px}
   #slider-wrap{width:100%;order:5}
   #sidebar{width:100vw;max-width:100vw}
@@ -1249,18 +1251,22 @@ class OrbitRig {
     d.addEventListener('contextmenu',e=>e.preventDefault());
     d.addEventListener('pointerdown',e=>{
       if(!self.enabled) return;
+      if(e.pointerType==='touch') e.preventDefault();
       touches[e.pointerId]={x:e.clientX,y:e.clientY};
-      const n=Object.keys(touches).length;
+      const list=Object.values(touches), n=list.length;
       if(e.pointerType==='touch'){
         mode = n===1 ? 'rot' : 'panzoom';
-        if(n===2){ const t=Object.values(touches); pinch=Math.hypot(t[0].x-t[1].x,t[0].y-t[1].y); }
+        if(n>=2){
+          pinch=Math.hypot(list[0].x-list[1].x,list[0].y-list[1].y);
+          lx=(list[0].x+list[1].x)/2; ly=(list[0].y+list[1].y)/2; // anchor on centroid, no jump
+        } else { lx=e.clientX; ly=e.clientY; }
       } else {
         mode = (e.button===2 || e.button===1) ? 'pan' : 'rot';
+        lx=e.clientX; ly=e.clientY;
       }
-      lx=e.clientX; ly=e.clientY;
       appEl.classList.add('grabbing');
       d.setPointerCapture(e.pointerId);
-      self.moved=0;
+      if(n===1) self.moved=0; // a new gesture starts only with the first finger
     });
     d.addEventListener('pointermove',e=>{
       if(!self.enabled || !mode) return;
@@ -1269,7 +1275,7 @@ class OrbitRig {
       if(mode==='panzoom' && list.length>=2){
         const cx=(list[0].x+list[1].x)/2, cy=(list[0].y+list[1].y)/2;
         const np=Math.hypot(list[0].x-list[1].x, list[0].y-list[1].y);
-        if(pinch>0) self.sphGoal.radius=THREE.MathUtils.clamp(self.sphGoal.radius*(pinch/np), self.minR, self.maxR);
+        if(pinch>4&&np>4) self.sphGoal.radius=THREE.MathUtils.clamp(self.sphGoal.radius*(pinch/np), self.minR, self.maxR);
         pinch=np;
         self._pan(cx-lx, cy-ly); lx=cx; ly=cy;
         self.moved+=2;
@@ -1284,7 +1290,11 @@ class OrbitRig {
     });
     const up=e=>{
       delete touches[e.pointerId];
-      if(Object.keys(touches).length===0){ mode=null; appEl.classList.remove('grabbing'); }
+      const list=Object.values(touches);
+      if(list.length===0){ mode=null; appEl.classList.remove('grabbing'); }
+      else if(list.length===1 && e.pointerType==='touch'){
+        mode='rot'; lx=list[0].x; ly=list[0].y; pinch=0; // 2→1 fingers: re-anchor, no jump
+      }
     };
     d.addEventListener('pointerup',up); d.addEventListener('pointercancel',up);
     d.addEventListener('wheel',e=>{
@@ -2037,6 +2047,11 @@ function spawnPlanets(sys, starPos){
       if(isJab) mesh.userData.special='jabberwocky';
       if(isCapital) mesh.userData.special='pgfcapital';
     }
+    // finger-sized invisible hit target (raycast resolves back to the planet mesh)
+    const pickP=new THREE.Mesh(new THREE.SphereGeometry(Math.max(r*2.4,0.3),8,8),
+      new THREE.MeshBasicMaterial({visible:false}));
+    pickP.userData=mesh.userData;
+    mesh.add(pickP);
     planetsGroup.add(mesh);
     made[p.name]=mesh;
     if(pairInfo){
@@ -2245,8 +2260,12 @@ function castAt(cx,cy){
   pointer.x=(cx/innerWidth)*2-1;
   pointer.y=-(cy/innerHeight)*2+1;
   raycaster.setFromCamera(pointer,camera);
-  const pl=raycaster.intersectObjects(planetsGroup.children,false);
-  if(pl.length) return {kind:pl[0].object.userData.kind||'planet',obj:pl[0].object};
+  const pl=raycaster.intersectObjects(planetsGroup.children,true); // include hit-sphere children
+  if(pl.length){
+    let o=pl[0].object;
+    while(o.parent && o.parent!==planetsGroup) o=o.parent; // resolve to the actual planet mesh
+    if(o.userData && o.userData.kind) return {kind:o.userData.kind,obj:o};
+  }
   const st=raycaster.intersectObjects(pickMeshes,false);
   if(st.length) return {kind:'star',obj:st[0].object};
   return null;
@@ -2274,7 +2293,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
 renderer.domElement.addEventListener('pointerleave',()=>{tooltip.style.display='none';});
 
 renderer.domElement.addEventListener('click',e=>{
-  if(rig.moved>6) return;            // was a drag, not a click
+  if(rig.moved>14) return;           // was a drag, not a tap (finger-friendly threshold)
   const hit=castAt(e.clientX,e.clientY);
   if(!hit) return;
   if(hit.kind==='star'){
