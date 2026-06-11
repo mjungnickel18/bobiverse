@@ -2455,11 +2455,21 @@ addEventListener('resize',()=>{
 
 const clock=new THREE.Clock();
 let playAccum=0;
+let sheetShift=0; // keeps the focused system above the mobile bottom sheet
 function animate(){
   requestAnimationFrame(animate);
   const dt=clock.getDelta();
   const t=clock.getElapsedTime();
   rig.update();
+
+  // shift the render centre upward while the bottom sheet covers the lower half
+  const wantShift=(innerWidth<=720 && sidebar.classList.contains('active'))?0.24:0;
+  sheetShift+=(wantShift-sheetShift)*0.1;
+  if(sheetShift>0.002){
+    camera.setViewOffset(innerWidth,innerHeight,0,innerHeight*sheetShift,innerWidth,innerHeight);
+  } else if(camera.view && camera.view.enabled){
+    camera.clearViewOffset();
+  }
 
   // timeline autoplay (~24 years/sec)
   if(playing){
