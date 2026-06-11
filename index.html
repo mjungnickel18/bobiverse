@@ -216,6 +216,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sb-section li.apex{border-left-color:var(--red);color:#f0b9c4}
 .sb-section li.apex::after{content:"APEX";float:right;font-size:8px;letter-spacing:.14em;color:var(--red);border:1px solid rgba(255,77,109,.5);padding:1px 5px;margin-left:8px}
 .sb-section li .bio-d{display:block;color:var(--muted);font-size:10px;margin-top:1px}
+.hazard-card{border:1px solid rgba(255,77,109,.22);border-left:3px solid var(--red);background:rgba(255,77,109,.05);padding:9px 11px;margin-bottom:8px;font-size:11.5px}
+.hazard-card .hz-name{color:#f6c0cb;font-weight:600;letter-spacing:.04em}
+.hazard-card .hz-d{display:block;color:#b89aa0;font-size:10.5px;margin-top:3px;line-height:1.5}
+.hz-badge{float:right;font-size:8px;letter-spacing:.14em;padding:2px 6px;text-transform:uppercase;border:1px solid currentColor;margin-left:8px}
+.hz-lethal{color:#ff4d6d}.hz-nuisance{color:var(--amber)}.hz-environmental{color:#7fb8ff}
+.sb-section h4.hz{color:var(--red)}
 .mission-card{
   border:1px solid rgba(95,245,212,.12);border-left:3px solid var(--amber);
   background:rgba(255,255,255,.02);padding:10px 12px;margin-bottom:10px;cursor:pointer;
@@ -805,11 +811,13 @@ const PLANETS =[
         "n": "Raptors",
         "apex": true,
         "d": "pack-hunting theropods, keenly intelligent"
-      },
+      }
+    ],
+    "hazards": [
       {
         "n": "Cupid Bugs",
-        "apex": false,
-        "d": "parasites; larvae lethal within days"
+        "sev": "lethal",
+        "d": "Hummingbird-sized parasites. Lay eggs under the skin; larvae burrow to the heart within two days \\u2014 fatal."
       }
     ]
   },
@@ -830,6 +838,13 @@ const PLANETS =[
         "n": "Possible mass-extinction recovery",
         "apex": false
       }
+    ],
+    "hazards": [
+      {
+        "n": "Cupid Bugs (shared biosphere)",
+        "sev": "lethal",
+        "d": "Same parasite lineage as Vulcan; biocompatible with Earth life."
+      }
     ]
   },
   {
@@ -849,6 +864,13 @@ const PLANETS =[
         "n": "Kraken",
         "apex": true,
         "d": "deep-water ambush predators"
+      }
+    ],
+    "hazards": [
+      {
+        "n": "Mat-borne biters",
+        "sev": "nuisance",
+        "d": "The floating plant mats teem with small stinging fauna \\u2014 a constant nuisance for the mat colonists."
       }
     ]
   },
@@ -988,6 +1010,13 @@ const PLANETS =[
       {
         "n": "Predatory megafauna",
         "apex": true
+      }
+    ],
+    "hazards": [
+      {
+        "n": "Volcanic ashfall & toxic gas",
+        "sev": "environmental",
+        "d": "Planet-wide eruptions choke the air \\u2014 the slow catastrophe driving the Dragons toward extinction."
       }
     ]
   },
@@ -2231,7 +2260,7 @@ function spawnPlanets(sys, starPos){
     mesh.userData={kind:'planet',orbR,ang,
       speed:pairInfo?0.85:parent?0.5:0.1+Math.random()*0.2,
       spin:0.25+Math.random()*0.4,starPos:starPos.clone(),name:p.name,lore:p.lore||null,
-      gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,
+      gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,hazards:p.hazards||null,
       focusDist:Math.max(r*16,1.2)};
     if(parent){
       mesh.userData.parentMesh=parent;
@@ -2406,6 +2435,8 @@ function openSystem(sys){
     if(!sysBio.includes(b)) sysBio.push(b);
   }));
   const bioSysHTML=bioSection(sysBio.filter((b,i,a)=>a.findIndex(x=>x.n===b.n)===i));
+  const sysHaz=[]; PLANETS.filter(p=>p.systemId===sys.id&&p.hazards).forEach(p=>p.hazards.forEach(z=>sysHaz.push(z)));
+  const hazSysHTML=hazardSection(sysHaz.filter((z,i,a)=>a.findIndex(x=>x.n===z.n)===i));
   const note=SYSTEM_NOTES[sys.name];
   let noteHTML=note?`<div class="note-callout"><b>${esc(note[0])}:</b> ${esc(note[1])}</div>`:'';
   if(sys.novaYear){
@@ -2425,7 +2456,7 @@ function openSystem(sys){
       ${discovered!==undefined&&discovered>0?`<div class="stat wide"><b>${discovered}</b><span>first Bob arrival</span></div>`:''}
     </div>
     <p class="lore">${esc(sys.lore)}</p>
-    ${noteHTML}${planetsHTML}${bioSysHTML}${logsHTML}`;
+    ${noteHTML}${planetsHTML}${bioSysHTML}${hazSysHTML}${logsHTML}`;
   sidebar.classList.add('active');
 }
 function bioHTML(d){
@@ -2440,6 +2471,13 @@ function bioSection(bio){
   return `<div class="sb-section"><h4>Native biology</h4><ul>${bio.map(b=>
     `<li class="${b.apex?'apex':''}">${esc(b.n)}${b.d?`<span class="bio-d">${esc(b.d)}</span>`:''}</li>`).join('')}</ul></div>`;
 }
+function hazardSection(haz){
+  if(!haz||!haz.length) return '';
+  return `<div class="sb-section"><h4 class="hz">Hazards &amp; pests</h4>${haz.map(z=>
+    `<div class="hazard-card"><span class="hz-badge hz-${z.sev}">${esc(z.sev)}</span>`+
+    `<span class="hz-name">${esc(z.n)}</span>`+
+    `${z.d?`<span class="hz-d">${esc(z.d)}</span>`:''}</div>`).join('')}</div>`;
+}
 function openPlanet(d){
   const yr=parseInt(slider.value);
   const status=d.special==='ragnarok'?ragStatus(yr)
@@ -2453,6 +2491,7 @@ function openPlanet(d){
     <div class="stat-grid"><div class="stat"><b>${d.orbR.toFixed(2)} u</b><span>orbit radius</span></div>${bioHTML(d)}${statusRow}</div>
     ${d.lore?`<p class="lore">${esc(d.lore)}</p>`:''}
     ${bioSection(d.bio)}
+    ${hazardSection(d.hazards)}
     ${d.gravity!==undefined&&d.gravityEst?'<p class="jump-hint">* gravity estimated \u2014 not specified in the books</p>':''}`;
   sidebar.classList.add('active');
 }
