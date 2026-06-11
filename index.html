@@ -234,7 +234,14 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #hud-top{width:calc(100vw - 96px)}
   #deck{width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center;gap:10px;padding:10px 12px;bottom:12px}
   #slider-wrap{width:100%;order:5}
-  #sidebar{width:100vw;max-width:100vw}
+  #sidebar{
+    top:auto;bottom:0;width:100vw;max-width:100vw;height:50vh;height:50dvh;
+    border-left:none;border-top:1px solid var(--line);
+    transform:translateY(105%);
+  }
+  #sidebar.active{transform:none}
+  #sidebar::before{left:0;top:-1px;width:100%;height:2px;
+    background:linear-gradient(90deg,transparent,var(--accent) 30%,var(--accent) 70%,transparent)}
   #help-btn{bottom:auto;top:18px;right:18px;left:auto}
   .star-label{font-size:9px}
 }
@@ -1251,7 +1258,6 @@ class OrbitRig {
     d.addEventListener('contextmenu',e=>e.preventDefault());
     d.addEventListener('pointerdown',e=>{
       if(!self.enabled) return;
-      if(e.pointerType==='touch') e.preventDefault();
       touches[e.pointerId]={x:e.clientX,y:e.clientY};
       const list=Object.values(touches), n=list.length;
       if(e.pointerType==='touch'){
@@ -1266,7 +1272,8 @@ class OrbitRig {
       }
       appEl.classList.add('grabbing');
       d.setPointerCapture(e.pointerId);
-      if(n===1) self.moved=0; // a new gesture starts only with the first finger
+      if(n===1){ self.moved=0; self.multi=false; } // a new gesture starts with the first finger
+      else self.multi=true; // pinches/pans never count as taps
     });
     d.addEventListener('pointermove',e=>{
       if(!self.enabled || !mode) return;
@@ -2238,10 +2245,7 @@ function flyToSystem(name){
 
 document.getElementById('close-sidebar').addEventListener('click',e=>{
   e.stopPropagation();
-  sidebar.classList.remove('active');
-  rig.follow=null;
-  clearPlanets();
-  gsap.to(reticle.material,{opacity:0,duration:0.4,onComplete:()=>{reticleObj=null;}});
+  sidebar.classList.remove('active'); // panel only — planets, focus, and reticle persist
 });
 sbContent.addEventListener('click',e=>{
   const card=e.target.closest('.mission-card');
@@ -2292,8 +2296,10 @@ renderer.domElement.addEventListener('pointermove',e=>{
 });
 renderer.domElement.addEventListener('pointerleave',()=>{tooltip.style.display='none';});
 
-renderer.domElement.addEventListener('click',e=>{
-  if(rig.moved>14) return;           // was a drag, not a tap (finger-friendly threshold)
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(e.pointerType==='mouse' && e.button!==0) return; // left button / any finger or pen
+  if(rig.moved>14 || rig.multi) return;               // drags and pinches are not taps
+  searchResults.classList.remove('active');
   const hit=castAt(e.clientX,e.clientY);
   if(!hit) return;
   if(hit.kind==='star'){
