@@ -433,11 +433,12 @@ const SYSTEMS =[
     "y": 11.02,
     "z": -13.45,
     "color": "#ffee58",
-    "lore": "Colonized by Japanese and Canadian enclaves.",
+    "lore": "Two habitable worlds — Valhalla (Canadian enclave) and Takamagahara (Japanese enclave) — plus Valhalla's life-bearing moon Asgard. Site of four battles against the Brazilian probe Medeiros.",
     "bobs": [
       "Isaac",
       "Jack",
-      "Owen"
+      "Owen",
+      "Milo"
     ],
     "size_class": "medium",
     "orbitScale": 1.0,
@@ -932,12 +933,6 @@ const PLANETS =[
     ]
   },
   {
-    "systemId": "82_eridani",
-    "name": "Takamagahara",
-    "orbit": 1.8,
-    "lore": "Colonized by Japanese and Canadian enclaves."
-  },
-  {
     "systemId": "delta_pavonis",
     "name": "Delta Pavonis 4 (Old Pav)",
     "orbit": 1.2,
@@ -1184,6 +1179,64 @@ const PLANETS =[
       "Phineas and Ferb drove the two Pav colony ships in from Delta Pavonis in 2247; the 20,000 Pav were settled by 2257.",
       "The Pav are highly distrustful — some suspect the Bobs, not the Others, destroyed Old Pav — and aggressively defend their new system.",
       "Pav are giant meerkat-like beings who wear clothing and form families of eight adults."
+    ]
+  },
+  {
+    "systemId": "82_eridani",
+    "name": "Valhalla",
+    "orbit": 1.0,
+    "special": "valhalla",
+    "gravity": 1.0,
+    "gravityEst": true,
+    "lore": "Habitable world toward the inner edge of 82 Eridani's comfort zone, settled by the Canadian enclave. Has two moons — one of them, Asgard, can also sustain life.",
+    "bio": [
+      {
+        "n": "Human colony (Canadian enclave)",
+        "apex": false
+      },
+      {
+        "n": "Native ecosystem",
+        "apex": false
+      }
+    ],
+    "facts": [
+      "Settled by the Canadian enclave, who arrived in colony ships piloted by Isaac, Jack and Owen.",
+      "Its moon Asgard sustains life too, though under a thin atmosphere.",
+      "The system saw four separate battles against the Brazilian probe Medeiros."
+    ]
+  },
+  {
+    "systemId": "82_eridani",
+    "name": "Asgard (moon of Valhalla)",
+    "orbit": 0.42,
+    "moonOf": "Valhalla",
+    "gravity": 0.6,
+    "gravityEst": true,
+    "lore": "A life-bearing moon of Valhalla, habitable but with only a thin atmosphere."
+  },
+  {
+    "systemId": "82_eridani",
+    "name": "Takamagahara",
+    "orbit": 1.7,
+    "special": "takama",
+    "gravity": 0.95,
+    "gravityEst": true,
+    "lore": "Habitable rocky world toward the outer comfort zone of 82 Eridani, settled by the Japanese enclave. Owen first named it Jotunheim ('Land of the Giants'); Katsu Ito renamed it Takamagahara — 'the abode of the heavenly gods' — usually shortened to Takama.",
+    "bio": [
+      {
+        "n": "Human colony (Japanese enclave)",
+        "apex": false
+      },
+      {
+        "n": "Native ecosystem",
+        "apex": false
+      }
+    ],
+    "facts": [
+      "Originally named Jotunheim by Owen, after the Norse Land of the Giants.",
+      "Renamed by Katsu Ito to Takamagahara, Japanese for 'the abode of the heavenly gods'.",
+      "A Bob warned Ito the name would be hard to say — so it's usually shortened to 'Takama'.",
+      "First catalogued by the Brazilian probe Medeiros, but Milo was the first Bob to actually arrive."
     ]
   }
 ];
@@ -2298,6 +2351,21 @@ function updateNewPav(year){
     p.material.emissive.set(settled?0xffb05a:0x000000); // Pav settlement lights
   });
 }
+function updateColony(year){
+  planetsGroup.children.forEach(p=>{
+    const d=p.userData;
+    if(!d||d.special!=='colony') return;
+    const settled=year>=2185;
+    if(settled===d.settled) return;
+    d.settled=settled;
+    p.material.emissive.set(settled?0xffe0a8:0x000000); // human enclave lights
+  });
+}
+function colonyStatus(y){
+  if(y<2180) return 'Uninhabited habitable world';
+  if(y<2185) return 'Colony ships inbound';
+  return 'Human enclave colony';
+}
 function newPavStatus(y){
   if(y<2240) return 'Uninhabited · catalogued by Steve';
   if(y<2247) return 'Terraforming for the Pav';
@@ -2474,10 +2542,14 @@ function spawnPlanets(sys, starPos){
     const isCapital=p.special==='pgfcapital';
     const isNewHome=p.special==='newhome';
     const isNewPav=p.special==='newpav';
+    const isValhalla=p.special==='valhalla';
+    const isTakama=p.special==='takama';
+    const isColony=isValhalla||isTakama;
+    const isAsgard=/^Asgard/.test(p.name);
     const isJovian=/jovian/i.test(p.name);
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2505,6 +2577,15 @@ function spawnPlanets(sys, starPos){
     } else if(isNewPav){
       map=planetTexture(p.name,'#1d5570','#5a8a3c',{blobs:28,caps:true}); // blue-green, slightly drier/olive
       atmoColor='#a8dcc4';
+    } else if(isValhalla){
+      map=planetTexture(p.name,'#1a5278','#3a7a44',{blobs:30,caps:true}); // temperate blue-green
+      atmoColor='#a6d8f0';
+    } else if(isTakama){
+      map=planetTexture(p.name,'#236080','#4f8050',{blobs:26,caps:true}); // cooler outer-zone world
+      atmoColor='#bfe0e8';
+    } else if(isAsgard){
+      map=planetTexture(p.name,'#5a6a62','#7d8a6a',{blobs:18,caps:true}); // thin-atmosphere, muted green-grey
+      atmoColor='#b8c4b0';
     } else if(isRoanoke){
       map=roanokeTexture();
       atmoColor='#9fe0c8';
@@ -2531,6 +2612,7 @@ function spawnPlanets(sys, starPos){
     let emiMap=null, emiColor=0x000000;
     if(isPoseidon){ emiMap=poseidonLightsTexture(); emiColor=settled0?0xffb05a:0x000000; }
     if(isNewPav){ emiMap=newPavLightsTexture(); emiColor=parseInt(slider.value)>=2247?0xffb05a:0x000000; }
+    if(isColony){ emiMap=newPavLightsTexture(); emiColor=parseInt(slider.value)>=2185?0xffe0a8:0x000000; }
     if(isJab){ emiMap=jabberwockyCracks(); emiColor=0xff5a2a; }      // eruption fissures
     if(isCapital){ emiMap=capitalGrid(); emiColor=0x2bd8c8; }        // AMI network still live
     const material=emiMap
@@ -2576,10 +2658,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
@@ -2604,6 +2686,10 @@ function spawnPlanets(sys, starPos){
       if(isNewPav){
         mesh.userData.special='newpav';
         mesh.userData.settled=parseInt(slider.value)>=2247;
+      }
+      if(isColony){
+        mesh.userData.special='colony';
+        mesh.userData.settled=parseInt(slider.value)>=2185;
       }
     }
     // finger-sized invisible hit target (raycast resolves back to the planet mesh)
@@ -2818,6 +2904,7 @@ function openPlanet(d){
   const status=d.special==='ragnarok'?ragStatus(yr)
     :d.special==='poseidon'?poseidonStatus(yr)
     :d.special==='newpav'?newPavStatus(yr)
+    :d.special==='colony'?colonyStatus(yr)
     :d.special==='oldpav'?oldPavStatus(yr):null;
   const statusRow=status
     ?`<div class="stat wide"><b>${esc(status)}</b><span>status · year ${yr}</span></div>`
@@ -3045,6 +3132,7 @@ function updateTimeline(year){
   updateRagnarok(year);
   updatePoseidon(year);
   updateNewPav(year);
+  updateColony(year);
   updateOldPav(year);
   // bodies Bill flung at GL 877 vanish from their home system after 2225
   planetsGroup.children.forEach(p=>{
