@@ -3784,16 +3784,27 @@ function vrOnSelect(ctrl){
   const st=vrRaycaster.intersectObjects(pickMeshes,false)[0];
   if(st){
     const sys=byId(st.object.userData.systemId);
-    if(sys){ vrRecenterOn(st.object); vrShowSystem(sys); spawnPlanets(sys); }
+    if(sys){
+      spawnPlanets(sys, st.object.parent.position);   // pick sphere's parent group = the star
+      vrShowSystem(sys);
+      vrRecenterOn(st.object);
+    }
   }
 }
 
-// bring a selected world to a comfortable spot in front of the viewer by moving the rig
+// bring a selected system to a comfortable spot ahead — outside its own glow,
+// with the rig scaled so the planetary orbits fit in front of the viewer
 function vrRecenterOn(obj){
   if(!vrWorld) return;
+  // normalize zoom so orbits (~3.5 map units) span about 1.2m
+  const targetScale=0.32;
+  const k=targetScale/vrWorld.scale.x;
+  vrWorld.scale.setScalar(targetScale);
+  vrWorld.position.multiplyScalar(k);   // keep relative placement consistent under rescale
+  vrWorld.updateMatrixWorld(true);
   const wp=obj.getWorldPosition(new THREE.Vector3());
-  // translate the rig so the object lands ~1.4m ahead at eye height
-  const want=new THREE.Vector3(0,1.3,-1.0);
+  // star lands ~2.2m ahead, slightly below eye height — planets orbit visibly in front
+  const want=new THREE.Vector3(0,1.15,-2.2);
   vrWorld.position.add(want.sub(wp));
 }
 
@@ -3848,13 +3859,25 @@ function vrUpdate(dt,t){
     const dz=0.15; // deadzone
     const hand=src.handedness;
     if(hand==='right'){
-      if(Math.abs(sx)>dz) vrWorld.rotation.y -= sx*dt*1.4;            // rotate map
+      if(Math.abs(sx)>dz){
+        // rotate the map around the PLAYER (standing origin), not around Sol
+        const ang=-sx*dt*1.4;
+        const pivot=new THREE.Vector3(0,vrWorld.position.y,0);
+        vrWorld.position.sub(pivot);
+        vrWorld.position.applyAxisAngle(VR_UP,ang);
+        vrWorld.position.add(pivot);
+        vrWorld.rotateOnWorldAxis(VR_UP,ang);
+      }
       if(Math.abs(sy)>dz) vrWorld.position.y -= sy*dt*0.8;            // raise/lower map
     }
     if(hand==='left'){
-      if(Math.abs(sy)>dz){                                           // zoom (scale about the viewer)
-        const z=1+(-sy)*dt*0.9;
-        const ns=THREE.MathUtils.clamp(vrWorld.scale.x*z,0.04,6);
+      if(Math.abs(sy)>dz){
+        // zoom about a point ~1.5m in front of the viewer, so it zooms toward your gaze
+        const k=THREE.MathUtils.clamp(1+(-sy)*dt*0.9, 0.5, 1.5);
+        const ns=THREE.MathUtils.clamp(vrWorld.scale.x*k,0.04,6);
+        const real=ns/vrWorld.scale.x;
+        const pivot=new THREE.Vector3(0,1.3,-1.5);
+        vrWorld.position.sub(pivot).multiplyScalar(real).add(pivot);
         vrWorld.scale.setScalar(ns);
       }
       if(Math.abs(sx)>dz) vrWorld.position.x -= sx*dt*0.8;           // pan sideways
@@ -3880,8 +3903,24 @@ function vrUpdate(dt,t){
     if(hit) dist=hit.distance;
     if(vrRayLines[i]) vrRayLines[i].scale.z=dist;
   });
+  // panel lazy-follows the head: parked ahead-left, eases over, always faces you
+  if(vrPanel){
+    const xrCam=renderer.xr.getCamera ? renderer.xr.getCamera(camera) : camera;
+    xrCam.getWorldPosition(vrCamPos);
+    vrCamDir.set(0,0,-1).applyQuaternion(xrCam.getWorldQuaternion(vrTmpQ));
+    vrCamDir.y=0; if(vrCamDir.lengthSq()<0.001) vrCamDir.set(0,0,-1); vrCamDir.normalize();
+    const left=new THREE.Vector3(vrCamDir.z,0,-vrCamDir.x); // 90° left of gaze
+    vrPanelGoal.copy(vrCamPos)
+      .addScaledVector(vrCamDir,0.85)
+      .addScaledVector(left,0.42);
+    vrPanelGoal.y=vrCamPos.y-0.18;
+    vrPanel.position.lerp(vrPanelGoal,0.06);
+    vrPanel.lookAt(vrCamPos);
+  }
   if(vrPanelTex) vrPanelTex.needsUpdate=true;
 }
+const VR_UP=new THREE.Vector3(0,1,0);
+const vrCamPos=new THREE.Vector3(), vrCamDir=new THREE.Vector3(), vrPanelGoal=new THREE.Vector3();
 
 makeVRButton();
 
