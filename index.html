@@ -2494,6 +2494,8 @@ function spawnPlanets(sys, starPos){
     if(parent){
       mesh.userData.parentMesh=parent;
       mesh.userData.polar=isQuilt;           // KKP's orbit is tilted 90°
+      // small distinct inclination per moon so multiple moons don't lie perfectly coplanar
+      if(!isQuilt) mesh.userData.incl=(seededRandom(hashStr(p.name))()-0.5)*0.5; // ±~14°
       mesh.position.set(parent.position.x+orbR,parent.position.y,parent.position.z);
     } else {
       mesh.position.set(starPos.x+orbR*Math.cos(ang),starPos.y,starPos.z+orbR*Math.sin(ang));
@@ -2559,10 +2561,16 @@ function spawnPlanets(sys, starPos){
     if(pairInfo){
       // rings already created with the barycenter
     } else if(parent){
-      // polar moon-orbit ring, tracking Big Top each frame
+      // moon-orbit ring in the SAME plane the moon actually travels in
       const mr=new THREE.Mesh(new THREE.RingGeometry(orbR-0.006,orbR+0.006,64),
         new THREE.MeshBasicMaterial({color:0x9adfd2,side:THREE.DoubleSide,transparent:true,opacity:0.18}));
-      // default RingGeometry lies in the xy plane = vertical = the 90°-tilted orbit
+      // RingGeometry defaults to the XY (vertical) plane. The moon orbits in XZ (horizontal)
+      // unless it's a polar orbit (Quilt), so rotate the ring to match the moon's plane.
+      if(!isQuilt){
+        // orbit normal for inclination `incl` is (0, -cos incl, sin incl) — a tilt about X.
+        // RingGeometry normal starts at +Z; rotate -(PI/2 - incl) about X to align them.
+        mr.rotation.x=Math.PI/2 - (mesh.userData.incl||0);
+      }
       mr.raycast=()=>{};
       mr.userData={trackMesh:parent};
       mr.position.copy(parent.position);
@@ -3091,8 +3099,13 @@ function animate(){
       const cx=d.parentMesh?d.parentMesh.position:d.starPos;
       if(d.polar) // KKP: orbit plane tilted 90°
         p.position.set(cx.x+d.orbR*Math.cos(d.ang),cx.y+d.orbR*Math.sin(d.ang),cx.z);
-      else
-        p.position.set(cx.x+d.orbR*Math.cos(d.ang),cx.y,cx.z+d.orbR*Math.sin(d.ang));
+      else {
+        const incl=d.incl||0;
+        p.position.set(
+          cx.x+d.orbR*Math.cos(d.ang),
+          cx.y+d.orbR*Math.sin(d.ang)*Math.sin(incl), // gentle tilt out of the flat plane
+          cx.z+d.orbR*Math.sin(d.ang)*Math.cos(incl));
+      }
       p.rotation.y+=d.spin*dt;
       if(d.ring) d.ring.rotation.z-=d.spin*dt; // cancel the parent's spin: ring stays put
       if(d.clouds) d.clouds.rotation.y+=dt*0.12; // clouds drift relative to surface
