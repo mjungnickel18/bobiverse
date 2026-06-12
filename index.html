@@ -2348,7 +2348,10 @@ function spawnPlanets(sys, starPos){
     } else {
       mesh.position.set(starPos.x+orbR*Math.cos(ang),starPos.y,starPos.z+orbR*Math.sin(ang));
     }
-    if(isQuilt) mesh.rotation.z=Math.PI/2;   // axis tilted 90° (rolls like Uranus)
+    // axial tilt (degrees → rad): rings and spin axis follow from this
+    const AXIAL_TILT={Earth:23.4,Mars:25.2,Saturn:26.7,Neptune:28.3,Jupiter:3.1,Uranus:97.8};
+    if(isQuilt) mesh.rotation.z=Math.PI/2;   // KKP rolls on its side (~90°)
+    else if(AXIAL_TILT[p.name]!==undefined) mesh.rotation.z=AXIAL_TILT[p.name]*Math.PI/180;
     // thin atmosphere rim
     const atmoOp=isRag?0.08+0.32*ragT:isOldPav?(pavHarvested?0.08:0.3):isEden?0.26:isJab?0.34:isCapital?0.2:0.22;
     const atmo=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,
@@ -2394,11 +2397,14 @@ function spawnPlanets(sys, starPos){
     made[p.name]=mesh;
     if(PLANET_RINGS[p.name]){
       const [ri,ro,rc]=PLANET_RINGS[p.name];
-      const pr=new THREE.Mesh(new THREE.RingGeometry(r*ri,r*ro,48),
+      const pr=new THREE.Mesh(new THREE.RingGeometry(r*ri,r*ro,64),
         new THREE.MeshBasicMaterial({color:rc,side:THREE.DoubleSide,transparent:true,opacity:0.55,depthWrite:false}));
-      pr.rotation.x=p.name==='Uranus'?0.1:Math.PI/2-0.45; // Uranus rings nearly vertical
+      // RingGeometry lies in the local XY plane; rotate into the equatorial (XZ) plane.
+      // The planet mesh already carries the axial tilt, so the ring inherits it correctly.
+      pr.rotation.x=Math.PI/2;
       pr.raycast=()=>{};
       mesh.add(pr);
+      mesh.userData.ring=pr; // counter-spun each frame so it doesn't rotate with the surface
     }
     if(pairInfo){
       // rings already created with the barycenter
@@ -2910,6 +2916,7 @@ function animate(){
       else
         p.position.set(cx.x+d.orbR*Math.cos(d.ang),cx.y,cx.z+d.orbR*Math.sin(d.ang));
       p.rotation.y+=d.spin*dt;
+      if(d.ring) d.ring.rotation.z-=d.spin*dt; // cancel the parent's spin: ring stays put
       if(d.clouds) d.clouds.rotation.y+=dt*0.12; // clouds drift relative to surface
       if(d.special==='jabberwocky') p.material.emissiveIntensity=0.7+Math.sin(t*1.4)*0.3; // eruptions pulse
       if(d.special==='pgfcapital') p.material.emissiveIntensity=0.85+Math.sin(t*0.7)*0.15; // AMI hum
