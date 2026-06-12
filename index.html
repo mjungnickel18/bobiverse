@@ -222,6 +222,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .hz-badge{float:right;font-size:8px;letter-spacing:.14em;padding:2px 6px;text-transform:uppercase;border:1px solid currentColor;margin-left:8px}
 .hz-lethal{color:#ff4d6d}.hz-nuisance{color:var(--amber)}.hz-environmental{color:#7fb8ff}
 .sb-section h4.hz{color:var(--red)}
+.facts-list{list-style:none;margin-top:4px}
+.facts-list li{position:relative;padding:7px 0 7px 22px;border-bottom:1px dashed rgba(95,245,212,.12);color:#a9c6cc;font-size:11.5px;line-height:1.5}
+.facts-list li:last-child{border-bottom:none}
+.facts-list li::before{content:"\2737";position:absolute;left:2px;top:7px;color:var(--accent);font-size:10px;opacity:.7}
+.sb-section h4.facts{color:var(--amber)}
 .mission-card{
   border:1px solid rgba(95,245,212,.12);border-left:3px solid var(--amber);
   background:rgba(255,255,255,.02);padding:10px 12px;margin-bottom:10px;cursor:pointer;
@@ -735,6 +740,14 @@ const PLANETS =[
         "n": "Humans (15M survivors evacuated)",
         "apex": false
       }
+    ],
+    "facts": [
+      "The original Bob died in a car crash the day after signing up for cryonic preservation \\u2014 and woke up 117 years later as software in a HEAVEN probe.",
+      "FAITH (Free American Independent Theocratic Hegemony) legally declared all cryo-frozen humans dead and sold them for profit.",
+      "Bob escaped Sol watching the First Battle of Sol in his rear-view as the Brazilian probe Medeiros gave chase.",
+      "When Riker returned in 2157, Earth was ruined: Brazil nuked FAITH, China dropped asteroids on Brazil, and ecological collapse had begun.",
+      "Riker evacuated ~15 million survivors; Earth\\u2019s biosphere was expected to take 10,000 years to recover.",
+      "The Svalbard Global Seed Vault survivors (\\u201cThe Spits\\u201d) later seeded the terraforming of new worlds like Ragnar\\u00f6k."
     ]
   },
   {
@@ -770,7 +783,12 @@ const PLANETS =[
     "special": "ragnarok",
     "lore": "Second planet of Epsilon Eridani (0.85 AU). Barren rock terraformed by Bill's Skunk Works via redirected ice asteroids; by 2330 a habitable, forested world restored from the Svalbard vault.",
     "gravity": 0.95,
-    "gravityEst": true
+    "gravityEst": true,
+    "facts": [
+      "Bob named it Ragnar\\u00f6k because his terraforming plan was, literally, to bombard it with ice asteroids.",
+      "Its restored flora and fauna come from the Svalbard seed vault rescued from a dying Earth.",
+      "Bill ran his entire Skunk Works from this system \\u2014 SCUT comms, SURGE fields and plasma weapons were all developed here."
+    ]
   },
   {
     "systemId": "epsilon_indi",
@@ -791,6 +809,10 @@ const PLANETS =[
         "n": "Patchwork photosynthetic flora",
         "apex": false
       }
+    ],
+    "facts": [
+      "Both its orbit and its axis are tilted ~90\\u00b0, producing wild seasons that bred its patchwork biology.",
+      "Seen from orbit the divergent photosynthesis zones look like a crazy quilt \\u2014 hence the settlers\\u2019 name."
     ]
   },
   {
@@ -819,6 +841,11 @@ const PLANETS =[
         "sev": "lethal",
         "d": "Hummingbird-sized parasites. Lay eggs under the skin; larvae burrow to the heart within two days \\u2014 fatal."
       }
+    ],
+    "facts": [
+      "Discovered by the Bob named Milo; the twin worlds were christened Vulcan and Romulus after Star Trek and Romulan lore.",
+      "Settled by Exodus 1, carrying USE survivors; the first town was simply called Landing (Dec 2188).",
+      "Around 2200 the colonists rose up to overthrow the theocracy that governed them."
     ]
   },
   {
@@ -845,6 +872,10 @@ const PLANETS =[
         "sev": "lethal",
         "d": "Same parasite lineage as Vulcan; biocompatible with Earth life."
       }
+    ],
+    "facts": [
+      "Settled by FAITH survivors aboard Exodus 3 \\u2014 a different faction than neighboring Vulcan.",
+      "May be recovering from an ancient mass extinction, leaving it biologically a step behind its twin."
     ]
   },
   {
@@ -872,6 +903,11 @@ const PLANETS =[
         "sev": "nuisance",
         "d": "The floating plant mats teem with small stinging fauna \\u2014 a constant nuisance for the mat colonists."
       }
+    ],
+    "facts": [
+      "Its single ocean is roughly 800 km deep \\u2014 there is no land and no ice anywhere.",
+      "All the planet\\u2019s oxygen is produced by kilometers-wide floating plant mats.",
+      "Kraken attacks eventually forced the mat colonists up into Marcus\\u2019 suspended sky-cities."
     ]
   },
   {
@@ -894,6 +930,11 @@ const PLANETS =[
         "apex": false,
         "d": "avian sapients; evacuated before the harvest"
       }
+    ],
+    "facts": [
+      "Jacques was mid-contact with the Pav when the Others\\u2019 harvesting fleet arrived to strip the planet.",
+      "20,000 Pav were evacuated to New Pav \\u2014 the Bobs\\u2019 first rescue of an entire species.",
+      "Defending the Pav got humanity officially labeled \\u201cpests\\u201d by the Others, marking them for destruction."
     ]
   },
   {
@@ -919,6 +960,11 @@ const PLANETS =[
         "n": "Hippgriffs",
         "apex": false
       }
+    ],
+    "facts": [
+      "The Deltans called Bob \\u201cBawbe\\u201d \\u2014 he became a god-figure to Archimedes\\u2019 tribe.",
+      "Bob broke his own non-interference instincts to teach the Deltans better weapons against the predatory Gorilloids.",
+      "Archimedes reminded Bob of his own childhood inventor self \\u2014 the emotional heart of book 1."
     ]
   },
   {
@@ -986,6 +1032,9 @@ const PLANETS =[
         "n": "No intelligent life",
         "apex": false
       }
+    ],
+    "facts": [
+      "A perfect colony world \\u2014 except it sat right on the Others\\u2019 frontier, so settlement had to wait for the 2257 nova."
     ]
   },
   {
@@ -1018,6 +1067,11 @@ const PLANETS =[
         "sev": "environmental",
         "d": "Planet-wide eruptions choke the air \\u2014 the slow catastrophe driving the Dragons toward extinction."
       }
+    ],
+    "facts": [
+      "Found by Mario while hunting for the Others \\u2014 he discovered Dragons instead.",
+      "Balloon-whale Leviathans drift through its skies above an Iron-Age Dragon civilization.",
+      "Howard and Bridget walked among the Dragons in android bodies called \\u201cdrannys.\\u201d"
     ]
   },
   {
@@ -1033,6 +1087,10 @@ const PLANETS =[
         "n": "Abandoned \\u2014 inhabitants long gone",
         "apex": false
       }
+    ],
+    "facts": [
+      "Ick and Dae named it after Earth\\u2019s vanished Roanoke colony \\u2014 its people simply closed up and left.",
+      "They learned the entire Pan-Galactic Federation language from a single small-town library here."
     ]
   },
   {
@@ -1040,7 +1098,11 @@ const PLANETS =[
     "name": "PGF Capital Planet",
     "orbit": 1.7,
     "special": "pgfcapital",
-    "lore": "Capital of the Pan-Galactic Federation, whose wormhole network spans a third of the galaxy. The civilization evacuated around 254 CE ahead of a dwarf-galaxy collision — but the archivist AMI and its sentries still run, and they detained Icarus and Daedalus at the DMZ."
+    "lore": "Capital of the Pan-Galactic Federation, whose wormhole network spans a third of the galaxy. The civilization evacuated around 254 CE ahead of a dwarf-galaxy collision — but the archivist AMI and its sentries still run, and they detained Icarus and Daedalus at the DMZ.",
+    "facts": [
+      "The Federation evacuated around 254 CE ahead of a dwarf-galaxy collision \\u2014 millennia before the Bobs arrived.",
+      "Its archivist AI, AMI, still runs the abandoned capital and detained Icarus and Daedalus at the DMZ."
+    ]
   },
   {
     "systemId": "hip_84051",
@@ -2260,7 +2322,7 @@ function spawnPlanets(sys, starPos){
     mesh.userData={kind:'planet',orbR,ang,
       speed:pairInfo?0.85:parent?0.5:0.1+Math.random()*0.2,
       spin:0.25+Math.random()*0.4,starPos:starPos.clone(),name:p.name,lore:p.lore||null,
-      gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,hazards:p.hazards||null,
+      gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,hazards:p.hazards||null,facts:p.facts||null,
       focusDist:Math.max(r*16,1.2)};
     if(parent){
       mesh.userData.parentMesh=parent;
@@ -2437,6 +2499,10 @@ function openSystem(sys){
   const bioSysHTML=bioSection(sysBio.filter((b,i,a)=>a.findIndex(x=>x.n===b.n)===i));
   const sysHaz=[]; PLANETS.filter(p=>p.systemId===sys.id&&p.hazards).forEach(p=>p.hazards.forEach(z=>sysHaz.push(z)));
   const hazSysHTML=hazardSection(sysHaz.filter((z,i,a)=>a.findIndex(x=>x.n===z.n)===i));
+  const sysFacts=[]; PLANETS.filter(p=>p.systemId===sys.id&&p.facts).forEach(p=>{
+    p.facts.forEach(f=>sysFacts.push(p.name==='Earth'?f:`${p.name}: ${f}`));
+  });
+  const factsSysHTML=factsSection(sysFacts);
   const note=SYSTEM_NOTES[sys.name];
   let noteHTML=note?`<div class="note-callout"><b>${esc(note[0])}:</b> ${esc(note[1])}</div>`:'';
   if(sys.novaYear){
@@ -2456,7 +2522,7 @@ function openSystem(sys){
       ${discovered!==undefined&&discovered>0?`<div class="stat wide"><b>${discovered}</b><span>first Bob arrival</span></div>`:''}
     </div>
     <p class="lore">${esc(sys.lore)}</p>
-    ${noteHTML}${planetsHTML}${bioSysHTML}${hazSysHTML}${logsHTML}`;
+    ${noteHTML}${planetsHTML}${bioSysHTML}${hazSysHTML}${factsSysHTML}${logsHTML}`;
   sidebar.classList.add('active');
 }
 function bioHTML(d){
@@ -2470,6 +2536,11 @@ function bioSection(bio){
   if(!bio||!bio.length) return '';
   return `<div class="sb-section"><h4>Native biology</h4><ul>${bio.map(b=>
     `<li class="${b.apex?'apex':''}">${esc(b.n)}${b.d?`<span class="bio-d">${esc(b.d)}</span>`:''}</li>`).join('')}</ul></div>`;
+}
+function factsSection(facts){
+  if(!facts||!facts.length) return '';
+  return `<div class="sb-section"><h4 class="facts">Did you know?</h4><ul class="facts-list">${
+    facts.map(f=>`<li>${esc(f)}</li>`).join('')}</ul></div>`;
 }
 function hazardSection(haz){
   if(!haz||!haz.length) return '';
@@ -2492,6 +2563,7 @@ function openPlanet(d){
     ${d.lore?`<p class="lore">${esc(d.lore)}</p>`:''}
     ${bioSection(d.bio)}
     ${hazardSection(d.hazards)}
+    ${factsSection(d.facts)}
     ${d.gravity!==undefined&&d.gravityEst?'<p class="jump-hint">* gravity estimated \u2014 not specified in the books</p>':''}`;
   sidebar.classList.add('active');
 }
