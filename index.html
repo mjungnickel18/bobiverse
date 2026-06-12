@@ -3785,7 +3785,8 @@ function vrOnSelect(ctrl){
   if(st){
     const sys=byId(st.object.userData.systemId);
     if(sys){
-      spawnPlanets(sys, st.object.parent.position);   // pick sphere's parent group = the star
+      clearPlanets();                                  // avoid stacking duplicates on re-select
+      spawnPlanets(sys, st.object.parent.position);    // pick sphere's parent group = the star
       vrShowSystem(sys);
       vrRecenterOn(st.object);
     }
