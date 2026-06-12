@@ -778,6 +778,27 @@ const PLANETS =[
   },
   {
     "systemId": "epsilon_eridani",
+    "name": "Epsilon Eridani I",
+    "orbit": 0.9,
+    "consumedYear": 2225,
+    "lore": "Innermost planet of Epsilon Eridani. In 2225 Bill's asteroid movers flung it out of the system at relativistic speed — one of the two planetoids that detonated GL 877 in 2257."
+  },
+  {
+    "systemId": "epsilon_eridani",
+    "name": "Epsilon Eridani III",
+    "orbit": 3.2,
+    "lore": "Outer planet of Epsilon Eridani. Bill stripped one of its moons to use as a relativistic weapon against the Others."
+  },
+  {
+    "systemId": "epsilon_eridani",
+    "name": "EE III-b (moon)",
+    "orbit": 0.45,
+    "moonOf": "Epsilon Eridani III",
+    "consumedYear": 2225,
+    "lore": "A moon of Epsilon Eridani III, hurled at GL 877 in 2225 — the second of the two relativistic planetoids piloted by Icarus and Daedalus."
+  },
+  {
+    "systemId": "epsilon_eridani",
     "name": "Ragnarök",
     "orbit": 2.0,
     "isSkunkworksHub": true,
@@ -1961,36 +1982,50 @@ const planetoids=[];
   const start=sysPos(from), end=sysPos(to);
   const DEPART=2225, IMPACT=2257;
   const names=['Icarus','Daedalus'];
+  const dir=end.clone().sub(start);
+  const len=dir.length(); dir.normalize();
+  let side=new THREE.Vector3(0,1,0).cross(dir);
+  if(side.lengthSq()<0.01) side=new THREE.Vector3(1,0,0).cross(dir);
+  side.normalize();
+  const up=dir.clone().cross(side).normalize();
   for(let k=0;k<2;k++){
     const grp=new THREE.Group();
-    // rocky body
     const body=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10),
       new THREE.MeshBasicMaterial({color:0x9a8a7a}));
     body.raycast=()=>{};
-    // blue-shifted leading glow (relativistic)
     const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:cometTex,color:0xbfe6ff,
       transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));
     glow.scale.setScalar(1.1); glow.raycast=()=>{};
     grp.add(body,glow);
-    // streaking trail pointing back toward the origin
-    const dir=end.clone().sub(start).normalize();
-    const tailLen=6;
     const tail=new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015,0.16,tailLen,8,1,true),
+      new THREE.CylinderGeometry(0.015,0.16,5,8,1,true),
       new THREE.MeshBasicMaterial({color:0x7fd8ff,transparent:true,opacity:0.4,
         blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
     tail.raycast=()=>{};
-    // orient the cylinder (default +Y) along -dir, tail trailing behind
-    const up=new THREE.Vector3(0,1,0);
-    tail.quaternion.setFromUnitVectors(up, dir.clone().multiplyScalar(-1));
-    tail.position.copy(dir.clone().multiplyScalar(-tailLen/2));
     grp.add(tail);
     grp.visible=false;
     scene.add(grp);
-    planetoids.push({grp,body,glow,tail,start:start.clone(),end:end.clone(),
-      depart:DEPART,impact:IMPACT,offset:k*0.5,name:names[k]});
+    // two control points: bow out early, then swing to opposite sides of GL 877
+    // so the final approach vectors are nearly head-on from opposite hemispheres
+    const sign=k===0?1:-1, bow=len*0.30;
+    const ctrl1=start.clone().addScaledVector(dir,len*0.45)
+                  .addScaledVector(side,sign*bow)
+                  .addScaledVector(up,sign*bow*0.5);
+    // ctrl2 sits beyond the target on the opposite side, pulling the tail of the curve around
+    const ctrl2=end.clone().addScaledVector(side,sign*bow*1.6)
+                  .addScaledVector(up,-sign*bow*0.7)
+                  .addScaledVector(dir,len*0.12);
+    planetoids.push({grp,body,glow,tail,start:start.clone(),end:end.clone(),ctrl1,ctrl2,
+      depart:DEPART,impact:IMPACT,offset:k,name:names[k]});
   }
 })();
+function bezier(a,c1,c2,b,t){ // cubic Bezier
+  const mt=1-t, mt2=mt*mt, t2=t*t;
+  return a.clone().multiplyScalar(mt2*mt)
+    .add(c1.clone().multiplyScalar(3*mt2*t))
+    .add(c2.clone().multiplyScalar(3*mt*t2))
+    .add(b.clone().multiplyScalar(t2*t));
+}
 
 /* ============================================================
    Planets (spawned on focus) + Heaven's River megastructure
@@ -2423,6 +2458,7 @@ function spawnPlanets(sys, starPos){
       speed:pairInfo?0.85:parent?0.5:0.1+Math.random()*0.2,
       spin:0.25+Math.random()*0.4,starPos:starPos.clone(),name:p.name,lore:p.lore||null,
       gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,hazards:p.hazards||null,facts:p.facts||null,
+      consumedYear:p.consumedYear||null,
       focusDist:Math.max(r*16,1.2)};
     if(parent){
       mesh.userData.parentMesh=parent;
@@ -2504,6 +2540,7 @@ function spawnPlanets(sys, starPos){
       const ring=new THREE.Mesh(new THREE.RingGeometry(orbR-0.008,orbR+0.008,96),
         new THREE.MeshBasicMaterial({color:0x9adfd2,side:THREE.DoubleSide,transparent:true,opacity:0.22}));
       ring.rotation.x=Math.PI/2; ring.position.copy(starPos); ring.raycast=()=>{};
+      mesh.userData.orbitRing=ring;
       planetsGroup.add(ring);
     }
   });
@@ -2902,6 +2939,11 @@ function updateTimeline(year){
   updateRagnarok(year);
   updatePoseidon(year);
   updateOldPav(year);
+  // bodies Bill flung at GL 877 vanish from their home system after 2225
+  planetsGroup.children.forEach(p=>{
+    const cy=p.userData&&p.userData.consumedYear;
+    if(cy){ const gone=year>=cy; p.visible=!gone; if(p.userData.orbitRing) p.userData.orbitRing.visible=!gone; }
+  });
 }
 slider.addEventListener('input',e=>{
   const y=parseInt(e.target.value);
@@ -3059,27 +3101,31 @@ function animate(){
     c.position.lerpVectors(u.start,u.end,u.progress);
   });
 
-  // relativistic planetoids tracked to the actual timeline year (2225 → 2257)
+  // relativistic planetoids on curved paths, arriving from opposite sides (2225 → 2257)
   planetoids.forEach(p=>{
     const span=p.impact-p.depart;
     let prog=(year-p.depart)/span;
     p.grp.visible = year>=p.depart && year<=p.impact+1;
     if(!p.grp.visible) return;
     if(prog>=1){
-      // impact flash at GL 877, then fade
       prog=1;
       p.grp.position.copy(p.end);
-      const f=Math.max(0,1-(year-p.impact));        // 1 at impact-year, 0 a year later
+      const f=Math.max(0,1-(year-p.impact));
       const flash=0.5+Math.sin(t*30)*0.5;
       p.glow.scale.setScalar(1+ f*8*flash);
       p.glow.material.color.set(0xfff0d0);
       p.body.visible=false; p.tail.visible=false;
     } else {
-      // small per-planetoid offset so the two don't perfectly overlap
-      const pr=Math.max(0,prog - p.offset*0.012);
-      p.grp.position.lerpVectors(p.start,p.end,pr);
+      const pr=Math.max(0,prog);
+      const pos=bezier(p.start,p.ctrl1,p.ctrl2,p.end,pr);
+      p.grp.position.copy(pos);
+      // tangent for tail orientation
+      const ahead=bezier(p.start,p.ctrl1,p.ctrl2,p.end,Math.min(1,pr+0.01));
+      const tan=ahead.clone().sub(pos).normalize();
+      const up=new THREE.Vector3(0,1,0);
+      p.tail.quaternion.setFromUnitVectors(up, tan.clone().multiplyScalar(-1)); // tail trails behind
+      p.tail.position.copy(tan.clone().multiplyScalar(-2.5));
       p.body.visible=true; p.tail.visible=true;
-      // leading glow pulses; tail shimmers
       p.glow.scale.setScalar(1.0+0.2*Math.sin(t*6+p.offset*3));
       p.tail.material.opacity=0.3+0.15*Math.sin(t*4+p.offset*2);
     }
