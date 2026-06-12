@@ -244,7 +244,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .log-note{margin-top:6px;color:#7e919a;font-size:10.5px;line-height:1.5}
 .jump-hint{margin-top:6px;font-size:9px;letter-spacing:.18em;color:rgba(95,245,212,.45);text-transform:uppercase}
 
+#vr-btn{
+  position:fixed;z-index:120;top:18px;right:18px;
+  padding:10px 18px;font:600 11px/1 monospace;letter-spacing:.18em;color:#5ff5d4;
+  background:rgba(8,16,20,.82);border:1px solid rgba(95,245,212,.5);border-radius:3px;
+  cursor:pointer;backdrop-filter:blur(6px);display:none;
+}
+#vr-btn:hover{background:rgba(95,245,212,.12)}
 @media (max-width:720px){
+  #vr-btn{top:64px;right:18px}  /* below the help button on phones */
   #hud-top{width:calc(100vw - 96px)}
   #deck{width:calc(100vw - 24px);flex-wrap:wrap;justify-content:center;gap:10px;padding:10px 12px;bottom:12px}
   #slider-wrap{width:100%;order:5}
@@ -3646,10 +3654,7 @@ function makeVRButton(){
   const btn=document.createElement('button');
   btn.id='vr-btn';
   btn.textContent='ENTER VR';
-  btn.style.cssText='position:fixed;z-index:120;bottom:18px;left:50%;transform:translateX(-50%);'+
-    'padding:10px 22px;font:600 12px/1 monospace;letter-spacing:.18em;color:#5ff5d4;'+
-    'background:rgba(8,16,20,.82);border:1px solid rgba(95,245,212,.5);border-radius:3px;'+
-    'cursor:pointer;backdrop-filter:blur(6px);display:none';
+  // styled via the #vr-btn stylesheet rules (top-right, responsive)
   document.body.appendChild(btn);
   navigator.xr.isSessionSupported('immersive-vr').then(ok=>{
     if(!ok){ btn.textContent='VR NOT AVAILABLE'; btn.style.opacity=.5; btn.style.display='block'; return; }
