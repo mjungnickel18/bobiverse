@@ -1717,6 +1717,7 @@ camera.position.set(10, 7, 16);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.xr.enabled = true;            // WebXR for Meta Quest / PC-VR
 const appEl = document.getElementById('app');
 appEl.appendChild(renderer.domElement);
 
@@ -3478,7 +3479,6 @@ const clock=new THREE.Clock();
 let playAccum=0;
 let sheetShift=0; // keeps the focused system above the mobile bottom sheet
 function animate(){
-  requestAnimationFrame(animate);
   const dt=clock.getDelta();
   const t=clock.getElapsedTime();
   rig.update();
@@ -3627,10 +3627,194 @@ function animate(){
   });
 
   updateLabels();
-  renderer.render(scene,camera);
+  if(renderer.xr.isPresenting){ vrUpdate(dt,t); renderer.render(scene,camera); }
+  else renderer.render(scene,camera);
 }
+
+/* ============================================================
+   VR / WebXR module (Meta Quest) — immersive view with a
+   floating control panel and controller-ray selection.
+   ============================================================ */
+let vrPanel=null, vrPanelCtx=null, vrPanelTex=null, vrControllers=[], vrRayLines=[];
+let vrPlayBtnRect=null, vrTimelineRect=null;       // hit regions on the panel (in panel UV space)
+const vrTmp=new THREE.Vector3(), vrTmpQ=new THREE.Quaternion();
+const vrRaycaster=new THREE.Raycaster();
+
+function makeVRButton(){
+  if(!('xr' in navigator)) return;
+  const btn=document.createElement('button');
+  btn.id='vr-btn';
+  btn.textContent='ENTER VR';
+  btn.style.cssText='position:fixed;z-index:120;bottom:18px;left:50%;transform:translateX(-50%);'+
+    'padding:10px 22px;font:600 12px/1 monospace;letter-spacing:.18em;color:#5ff5d4;'+
+    'background:rgba(8,16,20,.82);border:1px solid rgba(95,245,212,.5);border-radius:3px;'+
+    'cursor:pointer;backdrop-filter:blur(6px);display:none';
+  document.body.appendChild(btn);
+  navigator.xr.isSessionSupported('immersive-vr').then(ok=>{
+    if(!ok){ btn.textContent='VR NOT AVAILABLE'; btn.style.opacity=.5; btn.style.display='block'; return; }
+    btn.style.display='block';
+    let session=null;
+    btn.onclick=async()=>{
+      if(session){ session.end(); return; }
+      session=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','bounded-floor']});
+      renderer.xr.setReferenceSpaceType('local-floor');
+      await renderer.xr.setSession(session);
+      btn.textContent='EXIT VR';
+      buildVRScene();
+      session.addEventListener('end',()=>{ session=null; btn.textContent='ENTER VR'; teardownVRScene(); });
+    };
+  }).catch(()=>{ btn.style.display='none'; });
+}
+
+function buildVRScene(){
+  // place the whole star map in front of and below the standing viewer, scaled to room size
+  starGroupHomeScale=starsGroup.scale.x;
+  // controllers + ray pointers
+  for(let i=0;i<2;i++){
+    const ctrl=renderer.xr.getController(i);
+    ctrl.userData.sel=false;
+    ctrl.addEventListener('selectstart',()=>{ ctrl.userData.sel=true; vrOnSelect(ctrl); });
+    ctrl.addEventListener('selectend',()=>{ ctrl.userData.sel=false; });
+    scene.add(ctrl);
+    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
+    const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x5ff5d4,transparent:true,opacity:0.6}));
+    line.scale.z=5; ctrl.add(line);
+    vrControllers.push(ctrl); vrRayLines.push(line);
+  }
+  buildVRPanel();
+  vrInfo('Point at a star or planet and pull the trigger. Panel on your left.');
+}
+
+function teardownVRScene(){
+  vrControllers.forEach(c=>scene.remove(c)); vrControllers=[]; vrRayLines=[];
+  if(vrPanel){ scene.remove(vrPanel); vrPanel=null; }
+}
+
+/* ---- floating control panel: a canvas-textured plane that shows telemetry + timeline ---- */
+function buildVRPanel(){
+  const cv=document.createElement('canvas'); cv.width=1024; cv.height=640;
+  vrPanelCtx=cv.getContext('2d');
+  vrPanelTex=new THREE.CanvasTexture(cv);
+  vrPanelTex.minFilter=THREE.LinearFilter; vrPanelTex.magFilter=THREE.LinearFilter;
+  const mat=new THREE.MeshBasicMaterial({map:vrPanelTex,transparent:true,side:THREE.DoubleSide});
+  vrPanel=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.375),mat);
+  vrPanel.position.set(-0.45,1.3,-0.7);
+  vrPanel.lookAt(0,1.5,0);
+  scene.add(vrPanel);
+  drawVRPanel('Bobiverse Starmap','Point & trigger a body to inspect it.\nLower bar: drag the year. Circle: play/pause.');
+}
+
+function drawVRPanel(title, body){
+  const x=vrPanelCtx, W=1024, H=640;
+  x.clearRect(0,0,W,H);
+  x.fillStyle='rgba(8,16,20,0.92)'; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(95,245,212,0.55)'; x.lineWidth=4; x.strokeRect(6,6,W-12,H-12);
+  // title
+  x.fillStyle='#5ff5d4'; x.font='600 38px monospace';
+  x.fillText(title, 34, 64);
+  x.strokeStyle='rgba(95,245,212,0.25)'; x.lineWidth=2;
+  x.beginPath(); x.moveTo(34,86); x.lineTo(W-34,86); x.stroke();
+  // body text (wrapped)
+  x.fillStyle='#bfe9e2'; x.font='24px monospace';
+  const lines=(body||'').split('\n'); let yy=128;
+  lines.forEach(ln=>{
+    // simple word-wrap at ~58 chars
+    let cur='';
+    ln.split(' ').forEach(word=>{
+      if((cur+word).length>54){ x.fillText(cur,34,yy); yy+=32; cur=''; }
+      cur+=word+' ';
+    });
+    x.fillText(cur,34,yy); yy+=38;
+  });
+  // timeline bar
+  const tlY=H-120, tlX=34, tlW=W-68;
+  x.fillStyle='rgba(95,245,212,0.18)'; x.fillRect(tlX,tlY,tlW,12);
+  const yr=parseInt(slider.value), frac=(yr-2133)/(2350-2133);
+  x.fillStyle='#5ff5d4'; x.fillRect(tlX,tlY,tlW*frac,12);
+  x.beginPath(); x.arc(tlX+tlW*frac,tlY+6,14,0,7); x.fill();
+  x.fillStyle='#bfe9e2'; x.font='600 30px monospace';
+  x.fillText('YEAR '+yr, tlX, tlY-20);
+  vrTimelineRect={x:tlX/W,y:tlY/H,w:tlW/W,h:40/H};
+  // play/pause circle
+  const pbX=W-90, pbY=H-60;
+  x.strokeStyle='#5ff5d4'; x.lineWidth=4; x.beginPath(); x.arc(pbX,pbY,34,0,7); x.stroke();
+  x.fillStyle='#5ff5d4';
+  if(typeof playing!=='undefined' && playing){ x.fillRect(pbX-12,pbY-15,8,30); x.fillRect(pbX+4,pbY-15,8,30); }
+  else { x.beginPath(); x.moveTo(pbX-10,pbY-16); x.lineTo(pbX-10,pbY+16); x.lineTo(pbX+18,pbY); x.closePath(); x.fill(); }
+  vrPlayBtnRect={x:(pbX-34)/W,y:(pbY-34)/H,w:68/W,h:68/H};
+  vrPanelTex.needsUpdate=true;
+}
+
+function vrInfo(msg){ if(vrPanel) drawVRPanel('Bobiverse Starmap', msg); }
+
+/* ---- controller selection: raycast against panel first, then stars/planets ---- */
+function vrOnSelect(ctrl){
+  vrTmp.set(0,0,-1).applyQuaternion(ctrl.getWorldQuaternion(vrTmpQ));
+  vrRaycaster.set(ctrl.getWorldPosition(new THREE.Vector3()), vrTmp);
+  // 1) panel hit?
+  if(vrPanel){
+    const hit=vrRaycaster.intersectObject(vrPanel,false)[0];
+    if(hit && hit.uv){ vrPanelClick(hit.uv.x, 1-hit.uv.y); return; }
+  }
+  // 2) planets, then stars
+  const pl=vrRaycaster.intersectObjects(planetsGroup.children,true)[0];
+  if(pl){ let o=pl.object; while(o.parent&&o.parent!==planetsGroup) o=o.parent;
+    if(o.userData&&o.userData.kind){ vrSelectBody(o); return; } }
+  const st=vrRaycaster.intersectObjects(pickMeshes,false)[0];
+  if(st){ const sys=byId(st.object.userData.systemId); if(sys){ flyToSystem(sys.name); vrShowSystem(sys); } }
+}
+
+function vrPanelClick(u,v){
+  // play/pause
+  if(vrPlayBtnRect && u>=vrPlayBtnRect.x && u<=vrPlayBtnRect.x+vrPlayBtnRect.w &&
+     v>=vrPlayBtnRect.y && v<=vrPlayBtnRect.y+vrPlayBtnRect.h){ if(playBtn) playBtn.click(); redrawVRPanel(); return; }
+  // timeline scrub
+  if(vrTimelineRect && u>=vrTimelineRect.x && u<=vrTimelineRect.x+vrTimelineRect.w &&
+     v>=vrTimelineRect.y-0.03 && v<=vrTimelineRect.y+vrTimelineRect.h){
+    const frac=(u-vrTimelineRect.x)/vrTimelineRect.w;
+    const yr=Math.round(2133+frac*(2350-2133));
+    slider.value=yr; setYearLabel(yr); updateTimeline(yr); redrawVRPanel();
+  }
+}
+
+function vrSelectBody(mesh){
+  const d=mesh.userData;
+  let body=(d.lore||'')+'';
+  if(d.gravity!==undefined) body='Gravity '+d.gravity.toFixed(2)+'g'+(d.gravityEst?'*':'')+'\n'+body;
+  drawVRPanel(d.name||'Body', body);
+  if(typeof focusObject==='function') focusObject(mesh, d.focusDist||1.5);
+}
+function vrShowSystem(sys){
+  const note=(sys.lore||'');
+  drawVRPanel(sys.name, note+'\nBobs: '+(sys.bobs||[]).join(', '));
+}
+function redrawVRPanel(){ if(vrPanel){ const t=vrPanel.userData.lastTitle||'Bobiverse Starmap'; drawVRPanel(t, vrPanel.userData.lastBody||''); } }
+
+let starGroupHomeScale=1;
+/* ---- per-frame VR updates: thumbstick locomotion + panel follows left hand loosely ---- */
+function vrUpdate(dt,t){
+  // right thumbstick: rotate the whole map; left thumbstick: zoom (scale)
+  const sess=renderer.xr.getSession(); if(!sess) return;
+  for(const src of sess.inputSources){
+    if(!src.gamepad) continue;
+    const ax=src.gamepad.axes;
+    const hand=src.handedness;
+    if(ax.length>=4){
+      if(hand==='right'){ starsGroup.rotation.y += ax[2]*dt*0.8; planetsGroup.rotation.y += ax[2]*dt*0.8; }
+      if(hand==='left'){
+        const z=1+(-ax[3])*dt*0.6;
+        const ns=THREE.MathUtils.clamp(starsGroup.scale.x*z,0.05,4);
+        starsGroup.scale.setScalar(ns); planetsGroup.scale.setScalar(ns);
+      }
+    }
+  }
+  if(vrPanelTex) vrPanelTex.needsUpdate=true;
+}
+
+makeVRButton();
+
 updateTimeline(2350);
-animate();
+renderer.setAnimationLoop(animate);   // XR-compatible loop (also drives the flat view)
 })();
 </script>
 </body>
