@@ -2211,6 +2211,17 @@ const PLANET_LOOKS=[
   ['#4a3d77','#7d6ab8','#a995e8',{bands:true,blobs:16}],
   ['#7a3d5e','#bd6f97','#e8a6c8',{blobs:20}]
 ];
+// real Solar System bodies get astronomically-plausible looks [base, accent, atmosphere, opts]
+const SOLAR_LOOKS={
+  Mercury:['#6b6460','#8c837c','#9a8f86',{blobs:34}],          // grey cratered rock
+  Venus:  ['#c9a86a','#e6cf9a','#f0dca8',{bands:true,blobs:10}],// pale yellow sulfuric clouds
+  Mars:   ['#9c3b1b','#c46a3a','#d98a5a',{blobs:24,caps:true}],// rust red + polar caps
+  Jupiter:['#b08458','#d8b48a','#e8c89a',{bands:true,blobs:6}], // tan banded gas giant
+  Saturn: ['#c8a96f','#e3cb95','#f0dcab',{bands:true,blobs:5}], // pale gold bands
+  Uranus: ['#7fb8c4','#a8dbe4','#c4ecf2',{blobs:6}],            // pale cyan ice giant
+  Neptune:['#2a52a8','#3f74d0','#6f9ce8',{blobs:8}],            // deep blue ice giant
+};
+const PLANET_RINGS={Saturn:[1.5,2.6,'#e3cb95'],Uranus:[1.6,2.0,'#bfe6ee']}; // [inner,outer,color]×radius
 function spawnPlanets(sys, starPos){
   const list=PLANETS.filter(p=>p.systemId===sys.id);
   if(!list.length) return;
@@ -2260,7 +2271,9 @@ function spawnPlanets(sys, starPos){
     const isRoanoke=p.special==='roanoke';
     const isCapital=p.special==='pgfcapital';
     const isJovian=/jovian/i.test(p.name);
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isJovian?0.15:0.10+Math.random()*0.05;
+    const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
+    const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2295,6 +2308,10 @@ function spawnPlanets(sys, starPos){
     } else if(p.name==='Earth'){
       map=planetTexture(p.name,'#155a86','#3a7a44',{blobs:30,caps:true});
       atmoColor='#8fd8ff';
+    } else if(SOLAR_LOOKS[p.name]){
+      look=SOLAR_LOOKS[p.name];
+      map=planetTexture(p.name,look[0],look[1],look[3]);
+      atmoColor=look[2];
     } else {
       look=isJovian?PLANET_LOOKS[2]:PLANET_LOOKS[idx%PLANET_LOOKS.length];
       map=planetTexture(p.name,look[0],look[1],look[3]);
@@ -2375,6 +2392,14 @@ function spawnPlanets(sys, starPos){
     mesh.add(pickP);
     planetsGroup.add(mesh);
     made[p.name]=mesh;
+    if(PLANET_RINGS[p.name]){
+      const [ri,ro,rc]=PLANET_RINGS[p.name];
+      const pr=new THREE.Mesh(new THREE.RingGeometry(r*ri,r*ro,48),
+        new THREE.MeshBasicMaterial({color:rc,side:THREE.DoubleSide,transparent:true,opacity:0.55,depthWrite:false}));
+      pr.rotation.x=p.name==='Uranus'?0.1:Math.PI/2-0.45; // Uranus rings nearly vertical
+      pr.raycast=()=>{};
+      mesh.add(pr);
+    }
     if(pairInfo){
       // rings already created with the barycenter
     } else if(parent){
