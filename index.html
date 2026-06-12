@@ -3636,6 +3636,7 @@ function animate(){
    floating control panel and controller-ray selection.
    ============================================================ */
 let vrPanel=null, vrPanelCtx=null, vrPanelTex=null, vrControllers=[], vrRayLines=[];
+let vrWorld=null, vrWorldChildren=[];
 let vrPlayBtnRect=null, vrTimelineRect=null;       // hit regions on the panel (in panel UV space)
 const vrTmp=new THREE.Vector3(), vrTmpQ=new THREE.Quaternion();
 const vrRaycaster=new THREE.Raycaster();
@@ -3667,14 +3668,20 @@ function makeVRButton(){
 }
 
 function buildVRScene(){
-  // place the whole star map in front of and below the standing viewer, scaled to room size
-  starGroupHomeScale=starsGroup.scale.x;
+  // Reparent the whole map into one rig so rotate/zoom/pan and ray-picking stay consistent.
+  vrWorld=new THREE.Group();
+  scene.add(vrWorld);
+  vrWorldChildren=[starsGroup, planetsGroup, trails];
+  vrWorldChildren.forEach(g=>{ if(g&&g.parent) g.parent.remove(g); if(g) vrWorld.add(g); });
+  // park the map a comfortable arm's length ahead and a bit below eye level, room-scaled
+  vrWorld.position.set(0,1.1,-1.4);
+  vrWorld.scale.setScalar(0.6);
   // controllers + ray pointers
   for(let i=0;i<2;i++){
     const ctrl=renderer.xr.getController(i);
     ctrl.userData.sel=false;
-    ctrl.addEventListener('selectstart',()=>{ ctrl.userData.sel=true; vrOnSelect(ctrl); });
-    ctrl.addEventListener('selectend',()=>{ ctrl.userData.sel=false; });
+    ctrl.addEventListener('selectstart',()=>{ ctrl.userData.sel=true; ctrl.userData.dragging=false; vrOnSelect(ctrl); });
+    ctrl.addEventListener('selectend',()=>{ ctrl.userData.sel=false; ctrl.userData.dragging=false; });
     scene.add(ctrl);
     const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-1)]);
     const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x5ff5d4,transparent:true,opacity:0.6}));
@@ -3682,10 +3689,17 @@ function buildVRScene(){
     vrControllers.push(ctrl); vrRayLines.push(line);
   }
   buildVRPanel();
-  vrInfo('Point at a star or planet and pull the trigger. Panel on your left.');
+  vrInfo('Trigger a body to inspect. Left stick: zoom/pan. Right stick: rotate/raise. Drag the year bar on the panel.');
 }
 
 function teardownVRScene(){
+  // put the map back under the scene for flat mode
+  if(vrWorld){
+    vrWorldChildren.forEach(g=>{ if(g&&g.parent===vrWorld) vrWorld.remove(g); if(g) scene.add(g); });
+    if(starsGroup){ starsGroup.rotation.set(0,0,0); starsGroup.scale.setScalar(1); starsGroup.position.set(0,0,0); }
+    if(planetsGroup){ planetsGroup.rotation.set(0,0,0); planetsGroup.scale.setScalar(1); planetsGroup.position.set(0,0,0); }
+    scene.remove(vrWorld); vrWorld=null;
+  }
   vrControllers.forEach(c=>scene.remove(c)); vrControllers=[]; vrRayLines=[];
   if(vrPanel){ scene.remove(vrPanel); vrPanel=null; }
 }
@@ -3705,6 +3719,7 @@ function buildVRPanel(){
 }
 
 function drawVRPanel(title, body){
+  if(vrPanel){ vrPanel.userData.lastTitle=title; vrPanel.userData.lastBody=body; }
   const x=vrPanelCtx, W=1024, H=640;
   x.clearRect(0,0,W,H);
   x.fillStyle='rgba(8,16,20,0.92)'; x.fillRect(0,0,W,H);
@@ -3749,19 +3764,32 @@ function vrInfo(msg){ if(vrPanel) drawVRPanel('Bobiverse Starmap', msg); }
 
 /* ---- controller selection: raycast against panel first, then stars/planets ---- */
 function vrOnSelect(ctrl){
-  vrTmp.set(0,0,-1).applyQuaternion(ctrl.getWorldQuaternion(vrTmpQ));
+  vrTmp.set(0,0,-1).applyQuaternion(ctrl.getWorldQuaternion(vrTmpQ)).normalize();
   vrRaycaster.set(ctrl.getWorldPosition(new THREE.Vector3()), vrTmp);
+  if(vrRaycaster.params&&vrRaycaster.params.Points) vrRaycaster.params.Points.threshold=0.2;
   // 1) panel hit?
   if(vrPanel){
     const hit=vrRaycaster.intersectObject(vrPanel,false)[0];
-    if(hit && hit.uv){ vrPanelClick(hit.uv.x, 1-hit.uv.y); return; }
+    if(hit && hit.uv){ ctrl.userData.dragging=true; vrPanelClick(hit.uv.x, 1-hit.uv.y); return; }
   }
-  // 2) planets, then stars
+  // 2) planets (recursive, includes the finger-sized hit spheres), then star pick spheres
   const pl=vrRaycaster.intersectObjects(planetsGroup.children,true)[0];
   if(pl){ let o=pl.object; while(o.parent&&o.parent!==planetsGroup) o=o.parent;
     if(o.userData&&o.userData.kind){ vrSelectBody(o); return; } }
   const st=vrRaycaster.intersectObjects(pickMeshes,false)[0];
-  if(st){ const sys=byId(st.object.userData.systemId); if(sys){ flyToSystem(sys.name); vrShowSystem(sys); } }
+  if(st){
+    const sys=byId(st.object.userData.systemId);
+    if(sys){ vrRecenterOn(st.object); vrShowSystem(sys); spawnPlanets(sys); }
+  }
+}
+
+// bring a selected world to a comfortable spot in front of the viewer by moving the rig
+function vrRecenterOn(obj){
+  if(!vrWorld) return;
+  const wp=obj.getWorldPosition(new THREE.Vector3());
+  // translate the rig so the object lands ~1.4m ahead at eye height
+  const want=new THREE.Vector3(0,1.3,-1.0);
+  vrWorld.position.add(want.sub(wp));
 }
 
 function vrPanelClick(u,v){
@@ -3774,6 +3802,18 @@ function vrPanelClick(u,v){
     const frac=(u-vrTimelineRect.x)/vrTimelineRect.w;
     const yr=Math.round(2133+frac*(2350-2133));
     slider.value=yr; setYearLabel(yr); updateTimeline(yr); redrawVRPanel();
+  }
+}
+
+function vrPanelDrag(u,v){
+  // continuous scrub: only acts on the timeline band, with a generous vertical tolerance
+  if(!vrTimelineRect) return;
+  if(u>=vrTimelineRect.x-0.02 && u<=vrTimelineRect.x+vrTimelineRect.w+0.02 &&
+     v>=vrTimelineRect.y-0.06 && v<=vrTimelineRect.y+vrTimelineRect.h+0.04){
+    const frac=THREE.MathUtils.clamp((u-vrTimelineRect.x)/vrTimelineRect.w,0,1);
+    const yr=Math.round(2133+frac*(2350-2133));
+    if(yr!==parseInt(slider.value)){ slider.value=yr; setYearLabel(yr); updateTimeline(yr); }
+    redrawVRPanel();
   }
 }
 
@@ -3793,21 +3833,48 @@ function redrawVRPanel(){ if(vrPanel){ const t=vrPanel.userData.lastTitle||'Bobi
 let starGroupHomeScale=1;
 /* ---- per-frame VR updates: thumbstick locomotion + panel follows left hand loosely ---- */
 function vrUpdate(dt,t){
-  // right thumbstick: rotate the whole map; left thumbstick: zoom (scale)
   const sess=renderer.xr.getSession(); if(!sess) return;
   for(const src of sess.inputSources){
     if(!src.gamepad) continue;
-    const ax=src.gamepad.axes;
+    const ax=src.gamepad.axes||[];
+    // Quest maps thumbsticks to axes[2],[3]; some browsers use [0],[1]. Pick whichever is live.
+    const sx = Math.abs(ax[2]||0) > Math.abs(ax[0]||0) ? (ax[2]||0) : (ax[0]||0);
+    const sy = Math.abs(ax[3]||0) > Math.abs(ax[1]||0) ? (ax[3]||0) : (ax[1]||0);
+    const dz=0.15; // deadzone
     const hand=src.handedness;
-    if(ax.length>=4){
-      if(hand==='right'){ starsGroup.rotation.y += ax[2]*dt*0.8; planetsGroup.rotation.y += ax[2]*dt*0.8; }
-      if(hand==='left'){
-        const z=1+(-ax[3])*dt*0.6;
-        const ns=THREE.MathUtils.clamp(starsGroup.scale.x*z,0.05,4);
-        starsGroup.scale.setScalar(ns); planetsGroup.scale.setScalar(ns);
+    if(hand==='right'){
+      if(Math.abs(sx)>dz) vrWorld.rotation.y -= sx*dt*1.4;            // rotate map
+      if(Math.abs(sy)>dz) vrWorld.position.y -= sy*dt*0.8;            // raise/lower map
+    }
+    if(hand==='left'){
+      if(Math.abs(sy)>dz){                                           // zoom (scale about the viewer)
+        const z=1+(-sy)*dt*0.9;
+        const ns=THREE.MathUtils.clamp(vrWorld.scale.x*z,0.04,6);
+        vrWorld.scale.setScalar(ns);
       }
+      if(Math.abs(sx)>dz) vrWorld.position.x -= sx*dt*0.8;           // pan sideways
     }
   }
+  // continuous interaction: while a trigger is held, keep hit-testing the panel (slider drag)
+  vrControllers.forEach(ctrl=>{
+    if(!ctrl.userData.sel) return;
+    vrTmp.set(0,0,-1).applyQuaternion(ctrl.getWorldQuaternion(vrTmpQ));
+    vrRaycaster.set(ctrl.getWorldPosition(new THREE.Vector3()), vrTmp);
+    if(vrPanel){
+      const hit=vrRaycaster.intersectObject(vrPanel,false)[0];
+      if(hit&&hit.uv){ vrPanelDrag(hit.uv.x, 1-hit.uv.y); }
+    }
+  });
+  // update ray pointer lengths so they visually meet the panel/bodies
+  vrControllers.forEach((ctrl,i)=>{
+    vrTmp.set(0,0,-1).applyQuaternion(ctrl.getWorldQuaternion(vrTmpQ));
+    vrRaycaster.set(ctrl.getWorldPosition(new THREE.Vector3()), vrTmp);
+    let dist=5;
+    const targets=[vrPanel].filter(Boolean).concat(pickMeshes);
+    const hit=vrRaycaster.intersectObjects(targets,false)[0];
+    if(hit) dist=hit.distance;
+    if(vrRayLines[i]) vrRayLines[i].scale.z=dist;
+  });
   if(vrPanelTex) vrPanelTex.needsUpdate=true;
 }
 
