@@ -612,10 +612,11 @@ const SYSTEMS =[
     "x": 22.34,
     "y": 22.74,
     "z": -22.75,
-    "color": "#ffcc80",
-    "lore": "Deep space system.",
+    "color": "#ffd27f",
+    "lore": "Howard's destination after leaving Vulcan — a ~20-year journey, arriving 2210. The star had “nice spectral lines” and the system could support life. Home of the gas giant Odin, where Howard and Bridget built a floating city.",
     "bobs": [
-      "N/A"
+      "Howard",
+      "Bridget"
     ],
     "size_class": "medium",
     "orbitScale": 1.0
@@ -1274,6 +1275,39 @@ const PLANETS =[
       "Renamed by Katsu Ito to Takamagahara, Japanese for 'the abode of the heavenly gods'.",
       "A Bob warned Ito the name would be hard to say — so it's usually shortened to 'Takama'.",
       "First catalogued by the Brazilian probe Medeiros, but Milo was the first Bob to actually arrive."
+    ]
+  },
+  {
+    "systemId": "hip_14101",
+    "name": "Odin (Jovian)",
+    "orbit": 1.4,
+    "special": "odin",
+    "gravity": 2.4,
+    "gravityEst": true,
+    "lore": "The main Jovian planet of HIP 14101, first explored by Howard — slightly larger than Saturn and, sitting closer to its star, far more meteorologically active. Howard and Bridget built a floating city in its skies and catalogued its life.",
+    "bio": [
+      {
+        "n": "Blimps",
+        "apex": false,
+        "d": "50-metre flying blimp-like animals — part squid, part jellyfish, part zeppelin, with tentacles and eyes on stalks; drift in flocks."
+      },
+      {
+        "n": "Mantas",
+        "apex": true,
+        "d": "Flying ray-like raptors that prey on baby Blimps."
+      },
+      {
+        "n": "Krill",
+        "apex": false,
+        "d": "Tiny flying insect-like animals; the Blimps' main food source."
+      }
+    ],
+    "facts": [
+      "First explored by Howard, ~20 years out from Vulcan, arriving 2210.",
+      "Slightly larger than Saturn but closer to its star, so its weather is far more violent.",
+      "Howard and Bridget built a floating city in Odin's atmosphere and catalogued its lifeforms.",
+      "Bridget was replicated here in October 2220; she and Howard later married between books 3 and 4.",
+      "The pair exported Vulcan beer across the colonies and adopted 10+ Vulcan orphans."
     ]
   }
 ];
@@ -2615,6 +2649,7 @@ function spawnPlanets(sys, starPos){
     const isColony=isValhalla||isTakama;
     const isQuin=p.special==='quin';
     const isEL3=p.special==='el3';
+    const isOdin=p.special==='odin';
     const isBarren=p.special==='barren'||p.special==='rocky';
     const isIceGiant=p.special==='icegiant';
     const isAsgard=/^Asgard/.test(p.name);
@@ -2622,7 +2657,7 @@ function spawnPlanets(sys, starPos){
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
     const isMoon=!!p.moonOf;
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony||isQuin||isEL3)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isIceGiant?0.15:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony||isQuin||isEL3)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isOdin?0.18:isIceGiant?0.15:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2662,6 +2697,9 @@ function spawnPlanets(sys, starPos){
     } else if(isEL3){
       map=planetTexture(p.name,'#1d5878','#3a7a4a',{blobs:28,caps:true}); // habitable green-blue
       atmoColor='#a8dcec';
+    } else if(isOdin){
+      map=planetTexture(p.name,'#9c6b4a','#d6a878',{bands:true,blobs:12}); // stormy banded Jovian
+      atmoColor='#e8c89a';
     } else if(isIceGiant){
       map=planetTexture(p.name,'#3a6a9a','#6f9cd0',{blobs:8}); // blue ice giant
       atmoColor='#9fc4ea';
@@ -2743,10 +2781,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard||isEL3||isQuin||isIceGiant){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard||isEL3||isQuin||isIceGiant||isOdin){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:isEL3?0.5:isQuin?0.2:isIceGiant?0.35:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:isEL3?0.5:isQuin?0.2:isIceGiant?0.35:isOdin?0.45:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
