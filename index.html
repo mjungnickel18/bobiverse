@@ -1309,6 +1309,69 @@ const PLANETS =[
       "Bridget was replicated here in October 2220; she and Howard later married between books 3 and 4.",
       "The pair exported Vulcan beer across the colonies and adopted 10+ Vulcan orphans."
     ]
+  },
+  {
+    "systemId": "gliese_877",
+    "name": "Others' Homeworld (GL 877 b)",
+    "orbit": 0.85,
+    "special": "othersworld",
+    "gravity": 1.1,
+    "gravityEst": true,
+    "novaConsumed": true,
+    "lore": "A rocky planet toward the inner edge of GL 877's habitable zone — the Others' homeworld. Heavily contaminated and choked with greenhouse gases from their relentless industry. Destroyed when the Bobs' planetoids made the star go nova in 2257.",
+    "bio": [
+      {
+        "n": "The Others",
+        "apex": true,
+        "d": "A hive-like spacefaring species that harvested all life and metal from every system in range, regarding other species as food or pests."
+      }
+    ],
+    "hazards": [
+      {
+        "n": "Industrial contamination",
+        "sev": "environmental",
+        "d": "Heavy pollution and greenhouse gases from the Others' industry."
+      }
+    ],
+    "facts": [
+      "First scouted by Bashful in November 2177, who called GL 877 'a nondescript star in an unforgettable patch of sky.'",
+      "The Others were building a Dyson sphere around the star, just outside this planet's orbit.",
+      "Destroyed in 2257 when relativistic planetoids made the star go nova — nothing remains out to the Oort cloud."
+    ]
+  },
+  {
+    "systemId": "gliese_877",
+    "name": "GL 877 c (inner rocky)",
+    "orbit": 1.2,
+    "special": "barren",
+    "novaConsumed": true,
+    "gravity": 0.8,
+    "gravityEst": true,
+    "lore": "The second inner rocky planet of the Others' home system. Lost with everything else in the 2257 nova."
+  },
+  {
+    "systemId": "gliese_877",
+    "name": "GL 877 d (Jovian)",
+    "orbit": 2.1,
+    "special": "odin",
+    "novaConsumed": true,
+    "gravity": 2.2,
+    "gravityEst": true,
+    "lore": "The system's outer gas giant. Annihilated when the Bobs detonated GL 877 in 2257."
+  },
+  {
+    "systemId": "kappa_ceti",
+    "name": "Kappa Ceti b (Super-Earth)",
+    "orbit": 1.1,
+    "special": "superearth",
+    "gravity": 1.6,
+    "gravityEst": true,
+    "lore": "An Earth-like 'super-Earth' in the habitable zone of Kappa Ceti — several times Earth's mass. The only body Luke noted when he explored the system around 2179.",
+    "facts": [
+      "First explored by Luke around 2179.",
+      "Kappa Ceti is a yellow-dwarf star about 29 light-years from Sol.",
+      "A super-Earth: Earth-like but several times more massive, giving it stronger surface gravity."
+    ]
   }
 ];
 const ROUTES =
@@ -2650,6 +2713,8 @@ function spawnPlanets(sys, starPos){
     const isQuin=p.special==='quin';
     const isEL3=p.special==='el3';
     const isOdin=p.special==='odin';
+    const isOthersWorld=p.special==='othersworld';
+    const isSuperEarth=p.special==='superearth';
     const isBarren=p.special==='barren'||p.special==='rocky';
     const isIceGiant=p.special==='icegiant';
     const isAsgard=/^Asgard/.test(p.name);
@@ -2657,7 +2722,7 @@ function spawnPlanets(sys, starPos){
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
     const isMoon=!!p.moonOf;
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony||isQuin||isEL3)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isOdin?0.18:isIceGiant?0.15:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony||isQuin||isEL3||isOthersWorld||isSuperEarth)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isOdin?0.18:isIceGiant?0.15:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2697,6 +2762,12 @@ function spawnPlanets(sys, starPos){
     } else if(isEL3){
       map=planetTexture(p.name,'#1d5878','#3a7a4a',{blobs:28,caps:true}); // habitable green-blue
       atmoColor='#a8dcec';
+    } else if(isOthersWorld){
+      map=planetTexture(p.name,'#5a4a30','#7d6a3a',{blobs:26}); // sickly contaminated brown-green, no caps
+      atmoColor='#b8a850'; // greenhouse haze
+    } else if(isSuperEarth){
+      map=planetTexture(p.name,'#1a5878','#3a8050',{blobs:30,caps:true}); // earthlike, lush
+      atmoColor='#a8e0d0';
     } else if(isOdin){
       map=planetTexture(p.name,'#9c6b4a','#d6a878',{bands:true,blobs:12}); // stormy banded Jovian
       atmoColor='#e8c89a';
@@ -2756,7 +2827,7 @@ function spawnPlanets(sys, starPos){
       speed:pairInfo?0.85:parent?0.5:0.1+Math.random()*0.2,
       spin:0.25+Math.random()*0.4,starPos:starPos.clone(),name:p.name,lore:p.lore||null,
       gravity:p.gravity,gravityEst:p.gravityEst,bio:p.bio||null,hazards:p.hazards||null,facts:p.facts||null,
-      consumedYear:p.consumedYear||null,
+      consumedYear:p.consumedYear||null,novaConsumed:p.novaConsumed||false,
       focusDist:Math.max(r*16,1.2)};
     if(parent){
       mesh.userData.parentMesh=parent;
@@ -2781,10 +2852,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard||isEL3||isQuin||isIceGiant||isOdin){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard||isEL3||isQuin||isIceGiant||isOdin||isOthersWorld||isSuperEarth){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:isEL3?0.5:isQuin?0.2:isIceGiant?0.35:isOdin?0.45:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:isEL3?0.5:isQuin?0.2:isIceGiant?0.35:isOdin?0.45:isOthersWorld?0.55:isSuperEarth?0.5:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
@@ -3261,6 +3332,8 @@ function updateTimeline(year){
   planetsGroup.children.forEach(p=>{
     const cy=p.userData&&p.userData.consumedYear;
     if(cy){ const gone=year>=cy; p.visible=!gone; if(p.userData.orbitRing) p.userData.orbitRing.visible=!gone; }
+    // GL 877's own planets are annihilated by the 2257 nova
+    if(p.userData&&p.userData.novaConsumed){ const gone=year>=2257; p.visible=!gone; if(p.userData.orbitRing) p.userData.orbitRing.visible=!gone; }
   });
 }
 slider.addEventListener('input',e=>{
