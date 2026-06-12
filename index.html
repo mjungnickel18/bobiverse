@@ -581,8 +581,8 @@ const SYSTEMS =[
     "x": 0.74,
     "y": 47.02,
     "z": -11.87,
-    "color": "#e0f7fa",
-    "lore": "Bender arrived first, went missing. Bob One followed.",
+    "color": "#eef4ff",
+    "lore": "An F2 V star like Sol but six times brighter. Bender vanished here chasing a strange infrared signature — the Heaven's River topopolis. Bob One followed his trail in 2331. Planets 2 (Quin) and 3 lie in the habitable zone, with the megastructure filling the gap between them.",
     "bobs": [
       "Bender",
       "Bob One"
@@ -986,34 +986,71 @@ const PLANETS =[
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 1",
-    "orbit": 1.0
+    "orbit": 1.0,
+    "special": "barren",
+    "lore": "Eta Leporis 1: an uninhabited planet of the Eta Leporis system, outside the habitable zone."
   },
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 2 (Quin)",
     "orbit": 1.5,
-    "lore": "Once habitable, now a dead wasteland ruined by global warfare."
+    "lore": "Eta Leporis 2, home planet of the Quinlans. Their civilization destroyed its own ecosystem in a war — Bob One's surveys in 2331 found conventional bombardment, nuclear strikes, crashed orbital bodies and even biological warfare. The survivors were moved into Heaven's River.",
+    "special": "quin",
+    "gravity": 1.0,
+    "gravityEst": true,
+    "bio": [
+      {
+        "n": "Quinlans (extinct here)",
+        "apex": false,
+        "d": "Otter/beaver-like sentients; the survivors were relocated to the topopolis."
+      }
+    ],
+    "hazards": [
+      {
+        "n": "War-devastated biosphere",
+        "sev": "environmental",
+        "d": "Conventional, nuclear and biological warfare wrecked the ecosystem; orbital bodies were crashed into the surface."
+      }
+    ],
+    "facts": [
+      "Quin is the Quinlans' homeworld — they wrecked it in a self-destructive war.",
+      "Bridget's autopsy of a native corpse revealed the war included biological weapons.",
+      "It has no moons — in fact no planet in Eta Leporis does.",
+      "The Quinlans are otter/beaver-like: four feet tall, furry, web-armed, superb swimmers."
+    ]
   },
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 3",
     "orbit": 2.0,
-    "lore": "A habitable planet orbiting just outside the Heaven's River megastructure."
+    "lore": "Eta Leporis 3, the other habitable-zone planet of the system, lying just outside the Heaven's River megastructure.",
+    "special": "el3",
+    "gravity": 1.0,
+    "gravityEst": true,
+    "facts": [
+      "Shares the comfort zone with Quin and the Heaven's River topopolis."
+    ]
   },
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 4",
-    "orbit": 2.5
+    "orbit": 2.5,
+    "special": "rocky",
+    "lore": "Eta Leporis 4: an uninhabited planet of the Eta Leporis system, outside the habitable zone."
   },
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 5",
-    "orbit": 3.0
+    "orbit": 3.0,
+    "special": "icegiant",
+    "lore": "Eta Leporis 5: an uninhabited planet of the Eta Leporis system, outside the habitable zone."
   },
   {
     "systemId": "eta_leporis",
     "name": "Eta Leporis 6",
-    "orbit": 3.5
+    "orbit": 3.5,
+    "special": "icegiant",
+    "lore": "Eta Leporis 6: an uninhabited planet of the Eta Leporis system, outside the habitable zone."
   },
   {
     "systemId": "eta_leporis",
@@ -2376,6 +2413,37 @@ function poseidonStatus(y){
   if(y<2195) return 'Surveyed by Mulder · no colony';
   return 'Mat colonies · suspended cities';
 }
+function quinTexture(){
+  const rnd=seededRandom(hashStr('Quin'));
+  const w=128,h=64,c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.fillStyle='#232c34'; x.fillRect(0,0,w,h);          // dim, dusty oceans
+  x.fillStyle='#3a352c';                               // dark grey-brown dead land
+  for(let i=0;i<26;i++){
+    const bx=rnd()*w, by=h*0.12+rnd()*h*0.76, br=2+rnd()*9;
+    x.beginPath(); x.ellipse(bx,by,br*1.6,br,rnd()*3,0,7); x.fill();
+    x.beginPath(); x.ellipse(bx-w,by,br*1.6,br,0,0,7); x.fill();
+  }
+  // dried-blood reddish dead-vegetation patches
+  x.fillStyle='#4a2e26';
+  for(let i=0;i<12;i++){
+    const bx=rnd()*w, by=h*0.15+rnd()*h*0.7, br=1.5+rnd()*4;
+    x.beginPath(); x.ellipse(bx,by,br*1.4,br*0.8,rnd()*3,0,7); x.fill();
+  }
+  // scorched blast zones (solid dark ellipses, no gradient — renders the same everywhere)
+  for(let i=0;i<12;i++){
+    const bx=rnd()*w, by=rnd()*h, br=2+rnd()*5;
+    x.fillStyle='rgba(14,9,6,0.8)';
+    x.beginPath(); x.ellipse(bx,by,br*1.6,br*1.2,rnd()*3,0,7); x.fill();
+  }
+  for(let i=0;i<7;i++){
+    const bx=rnd()*w, by=rnd()*h, br=1.2+rnd()*2.2;
+    x.strokeStyle='rgba(150,130,105,0.4)'; x.lineWidth=0.7;
+    x.beginPath(); x.arc(bx,by,br,0,7); x.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
 /* ---- Old Pav: living world until the Others' harvest (~2210) ----
    Same seeded geography in both states — it's the same planet, scoured. */
 const oldPavTexture=h=>h
@@ -2545,12 +2613,16 @@ function spawnPlanets(sys, starPos){
     const isValhalla=p.special==='valhalla';
     const isTakama=p.special==='takama';
     const isColony=isValhalla||isTakama;
+    const isQuin=p.special==='quin';
+    const isEL3=p.special==='el3';
+    const isBarren=p.special==='barren'||p.special==='rocky';
+    const isIceGiant=p.special==='icegiant';
     const isAsgard=/^Asgard/.test(p.name);
     const isJovian=/jovian/i.test(p.name);
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
     const isMoon=!!p.moonOf;
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav||isColony||isQuin||isEL3)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isIceGiant?0.15:isGiant?giantR:isJovian?0.15:isAsgard?0.07:isMoon?0.05+Math.random()*0.02:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2584,6 +2656,18 @@ function spawnPlanets(sys, starPos){
     } else if(isTakama){
       map=planetTexture(p.name,'#236080','#4f8050',{blobs:26,caps:true}); // cooler outer-zone world
       atmoColor='#bfe0e8';
+    } else if(isQuin){
+      map=quinTexture(); // war-scarred former homeworld
+      atmoColor='#9a8a7a';
+    } else if(isEL3){
+      map=planetTexture(p.name,'#1d5878','#3a7a4a',{blobs:28,caps:true}); // habitable green-blue
+      atmoColor='#a8dcec';
+    } else if(isIceGiant){
+      map=planetTexture(p.name,'#3a6a9a','#6f9cd0',{blobs:8}); // blue ice giant
+      atmoColor='#9fc4ea';
+    } else if(isBarren){
+      map=planetTexture(p.name,'#6b5d52','#8a7866',{blobs:30}); // grey-brown rock
+      atmoColor='#9a8d80';
     } else if(isAsgard){
       map=planetTexture(p.name,'#5a6a62','#7d8a6a',{blobs:18,caps:true}); // thin-atmosphere, muted green-grey
       atmoColor='#b8c4b0';
@@ -2659,10 +2743,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav||isColony||isAsgard||isEL3||isQuin||isIceGiant){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:isAsgard?0.2:isColony?0.55:isEL3?0.5:isQuin?0.2:isIceGiant?0.35:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
