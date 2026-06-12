@@ -1157,7 +1157,34 @@ const PLANETS =[
     "systemId": "hip_84051",
     "name": "New Pav",
     "orbit": 1.2,
-    "lore": "Colony world for 20000 rescued Pav survivors."
+    "lore": "Second planet of HIP 84051, catalogued by Steve: a rocky habitable world with a blue-green cast, atmosphere and native ecosystem. Jacques' team terraformed it over years with samples from the Pav homeworld, then resettled the 20,000 rescued Pav here (arrived 2247, settled by 2257).",
+    "special": "newpav",
+    "gravity": 0.95,
+    "gravityEst": true,
+    "bio": [
+      {
+        "n": "Pav (resettled)",
+        "apex": false,
+        "d": "Meerkat-like sentients; ~20,000 survivors of Old Pav, fiercely defensive of their new system."
+      },
+      {
+        "n": "Pre-angiosperm flora",
+        "apex": false,
+        "d": "Native plants predating flowering species."
+      },
+      {
+        "n": "Cold-blooded fauna",
+        "apex": false,
+        "d": "Native ectothermic animals."
+      }
+    ],
+    "facts": [
+      "Catalogued by the Bob named Steve; Jacques called HIP 84051 a young star.",
+      "Jacques' team spent years terraforming it and seeding samples taken from the Pav homeworld before the colonists arrived.",
+      "Phineas and Ferb drove the two Pav colony ships in from Delta Pavonis in 2247; the 20,000 Pav were settled by 2257.",
+      "The Pav are highly distrustful — some suspect the Bobs, not the Others, destroyed Old Pav — and aggressively defend their new system.",
+      "Pav are giant meerkat-like beings who wear clothing and form families of eight adults."
+    ]
   }
 ];
 const ROUTES =
@@ -2246,6 +2273,36 @@ function updatePoseidon(year){
     p.material.emissive.set(settled?0xffb05a:0x000000); // night-side city lights
   });
 }
+function newPavLightsTexture(){
+  const w=128,h=64,c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.fillStyle='#000'; x.fillRect(0,0,w,h);
+  const rnd=seededRandom(2247);
+  // a handful of Pav settlements clustered on the land masses
+  for(let s=0;s<7;s++){
+    const cxp=rnd()*w, cyp=h*0.2+rnd()*h*0.6;
+    for(let k=0;k<6;k++){
+      x.fillStyle='#ffe0a8';
+      x.fillRect(cxp+(rnd()-0.5)*10, cyp+(rnd()-0.5)*8, 1.1, 1.1);
+    }
+  }
+  return new THREE.CanvasTexture(c);
+}
+function updateNewPav(year){
+  planetsGroup.children.forEach(p=>{
+    const d=p.userData;
+    if(!d||d.special!=='newpav') return;
+    const settled=year>=2247;
+    if(settled===d.settled) return;
+    d.settled=settled;
+    p.material.emissive.set(settled?0xffb05a:0x000000); // Pav settlement lights
+  });
+}
+function newPavStatus(y){
+  if(y<2240) return 'Uninhabited · catalogued by Steve';
+  if(y<2247) return 'Terraforming for the Pav';
+  return 'Pav colony · ~20,000 settled';
+}
 function poseidonStatus(y){
   if(y<2170) return 'Uncharted ocean world';
   if(y<2195) return 'Surveyed by Mulder · no colony';
@@ -2416,10 +2473,11 @@ function spawnPlanets(sys, starPos){
     const isRoanoke=p.special==='roanoke';
     const isCapital=p.special==='pgfcapital';
     const isNewHome=p.special==='newhome';
+    const isNewPav=p.special==='newpav';
     const isJovian=/jovian/i.test(p.name);
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome||isNewPav)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2444,6 +2502,9 @@ function spawnPlanets(sys, starPos){
     } else if(isNewHome){
       map=planetTexture(p.name,'#1a5a8a','#2e8a48',{blobs:30,caps:true}); // blue-green marble
       atmoColor='#aee0ff';
+    } else if(isNewPav){
+      map=planetTexture(p.name,'#1d5570','#5a8a3c',{blobs:28,caps:true}); // blue-green, slightly drier/olive
+      atmoColor='#a8dcc4';
     } else if(isRoanoke){
       map=roanokeTexture();
       atmoColor='#9fe0c8';
@@ -2469,6 +2530,7 @@ function spawnPlanets(sys, starPos){
     const settled0=isPoseidon&&parseInt(slider.value)>=2195;
     let emiMap=null, emiColor=0x000000;
     if(isPoseidon){ emiMap=poseidonLightsTexture(); emiColor=settled0?0xffb05a:0x000000; }
+    if(isNewPav){ emiMap=newPavLightsTexture(); emiColor=parseInt(slider.value)>=2247?0xffb05a:0x000000; }
     if(isJab){ emiMap=jabberwockyCracks(); emiColor=0xff5a2a; }      // eruption fissures
     if(isCapital){ emiMap=capitalGrid(); emiColor=0x2bd8c8; }        // AMI network still live
     const material=emiMap
@@ -2514,10 +2576,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome||isNewPav){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:isNewPav?0.5:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
@@ -2539,6 +2601,10 @@ function spawnPlanets(sys, starPos){
       }
       if(isJab) mesh.userData.special='jabberwocky';
       if(isCapital) mesh.userData.special='pgfcapital';
+      if(isNewPav){
+        mesh.userData.special='newpav';
+        mesh.userData.settled=parseInt(slider.value)>=2247;
+      }
     }
     // finger-sized invisible hit target (raycast resolves back to the planet mesh)
     const pickP=new THREE.Mesh(new THREE.SphereGeometry(Math.max(r*2.4,0.3),8,8),
@@ -2751,6 +2817,7 @@ function openPlanet(d){
   const yr=parseInt(slider.value);
   const status=d.special==='ragnarok'?ragStatus(yr)
     :d.special==='poseidon'?poseidonStatus(yr)
+    :d.special==='newpav'?newPavStatus(yr)
     :d.special==='oldpav'?oldPavStatus(yr):null;
   const statusRow=status
     ?`<div class="stat wide"><b>${esc(status)}</b><span>status · year ${yr}</span></div>`
@@ -2977,6 +3044,7 @@ function updateTimeline(year){
   });
   updateRagnarok(year);
   updatePoseidon(year);
+  updateNewPav(year);
   updateOldPav(year);
   // bodies Bill flung at GL 877 vanish from their home system after 2225
   planetsGroup.children.forEach(p=>{
