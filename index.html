@@ -3792,20 +3792,23 @@ function vrOnSelect(ctrl){
   }
 }
 
-// bring a selected system to a comfortable spot ahead — outside its own glow,
-// with the rig scaled so the planetary orbits fit in front of the viewer
+// fly the rig smoothly so the selected system arrives ~2.2m ahead of the viewer
+let vrFly=null; // {p0,p1,s0,s1,t,dur}
 function vrRecenterOn(obj){
   if(!vrWorld) return;
-  // normalize zoom so orbits (~3.5 map units) span about 1.2m
   const targetScale=0.32;
+  // compute where the rig must END UP, without moving it yet:
+  // simulate: scale change k moves position by k, then translate so obj lands at `want`
   const k=targetScale/vrWorld.scale.x;
-  vrWorld.scale.setScalar(targetScale);
-  vrWorld.position.multiplyScalar(k);   // keep relative placement consistent under rescale
-  vrWorld.updateMatrixWorld(true);
-  const wp=obj.getWorldPosition(new THREE.Vector3());
-  // star lands ~2.2m ahead, slightly below eye height — planets orbit visibly in front
+  const endPos=vrWorld.position.clone().multiplyScalar(k);
+  // object's world position AFTER the rescale = its local offset scaled by k around rig origin
+  const wpNow=obj.getWorldPosition(new THREE.Vector3());
+  const rel=wpNow.sub(vrWorld.position);           // offset from rig origin (world units)
+  const wpAfter=endPos.clone().add(rel.multiplyScalar(k));
   const want=new THREE.Vector3(0,1.15,-2.2);
-  vrWorld.position.add(want.sub(wp));
+  endPos.add(want.sub(wpAfter));
+  vrFly={p0:vrWorld.position.clone(), p1:endPos,
+         s0:vrWorld.scale.x, s1:targetScale, t:0, dur:1.2};
 }
 
 function vrPanelClick(u,v){
@@ -3850,6 +3853,15 @@ let starGroupHomeScale=1;
 /* ---- per-frame VR updates: thumbstick locomotion + panel follows left hand loosely ---- */
 function vrUpdate(dt,t){
   const sess=renderer.xr.getSession(); if(!sess) return;
+  // smooth flight to a selected system
+  if(vrFly){
+    vrFly.t+=dt;
+    const u=Math.min(1, vrFly.t/vrFly.dur);
+    const e=u<0.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;   // easeInOutQuad
+    vrWorld.position.lerpVectors(vrFly.p0, vrFly.p1, e);
+    vrWorld.scale.setScalar(vrFly.s0+(vrFly.s1-vrFly.s0)*e);
+    if(u>=1) vrFly=null;
+  }
   for(const src of sess.inputSources){
     if(!src.gamepad) continue;
     const ax=src.gamepad.axes||[];
@@ -3857,6 +3869,7 @@ function vrUpdate(dt,t){
     const sx = Math.abs(ax[2]||0) > Math.abs(ax[0]||0) ? (ax[2]||0) : (ax[0]||0);
     const sy = Math.abs(ax[3]||0) > Math.abs(ax[1]||0) ? (ax[3]||0) : (ax[1]||0);
     const dz=0.15; // deadzone
+    if(vrFly && (Math.abs(sx)>dz||Math.abs(sy)>dz)) vrFly=null; // manual input takes over
     const hand=src.handedness;
     if(hand==='right'){
       if(Math.abs(sx)>dz){
