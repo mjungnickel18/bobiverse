@@ -2140,16 +2140,23 @@ SYSTEMS.forEach(sys=>{
 
 /* selection reticle — rotating dashed diamond ring */
 const reticle=(()=>{
-  const c=document.createElement('canvas'); c.width=c.height=128;
+  const SZ=512, hc=SZ/2;                       // hi-res so it stays crisp up close
+  const c=document.createElement('canvas'); c.width=c.height=SZ;
   const x=c.getContext('2d');
-  x.strokeStyle='rgba(95,245,212,0.95)'; x.lineWidth=3; x.setLineDash([10,8]);
-  x.beginPath(); x.arc(64,64,52,0,Math.PI*2); x.stroke();
-  x.setLineDash([]); x.lineWidth=2;
-  [[64,4],[124,64],[64,124],[4,64]].forEach(([px,py])=>{
-    x.beginPath(); x.moveTo(px,py);
-    x.lineTo(px+(64-px)*0.18, py+(64-py)*0.18); x.stroke();
+  const s=SZ/128;                              // scale factor from the old 128px design
+  x.strokeStyle='rgba(95,245,212,0.95)'; x.lineWidth=3*s; x.setLineDash([10*s,8*s]);
+  x.lineCap='round';
+  x.beginPath(); x.arc(hc,hc,52*s,0,Math.PI*2); x.stroke();
+  x.setLineDash([]); x.lineWidth=2*s;
+  [[4,64],[64,4],[124,64],[64,124]].forEach(([px,py])=>{
+    const ax=px*s, ay=py*s;
+    x.beginPath(); x.moveTo(ax,ay);
+    x.lineTo(ax+(hc-ax)*0.18, ay+(hc-ay)*0.18); x.stroke();
   });
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,opacity:0,depthWrite:false,depthTest:false}));
+  const tex=new THREE.CanvasTexture(c);
+  tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter; // smooth scaling
+  try{ tex.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy()); }catch(e){}
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,opacity:0,depthWrite:false,depthTest:false}));
   sp.raycast=()=>{}; sp.renderOrder=5; scene.add(sp);
   return sp;
 })();
