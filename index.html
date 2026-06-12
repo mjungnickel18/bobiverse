@@ -328,8 +328,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <script>
-const SYSTEMS =
-[
+const SYSTEMS =[
   {
     "id": "sol",
     "name": "Sol",
@@ -644,8 +643,8 @@ const SYSTEMS =
     "x": 7.0,
     "y": -9.0,
     "z": -27.8,
-    "color": "#fff6d8",
-    "lore": "Claude scouted this system on the Others' frontier and found a promising earth-like world — a perfect colony site, were it not for the neighbors.",
+    "color": "#fff4e0",
+    "lore": "An F-type star, slightly larger and hotter than Sol, on the Others' frontier. Claude scouted it in 2205 and found a beautiful blue-green colony world here.",
     "bobs": [
       "Claude"
     ],
@@ -1044,9 +1043,9 @@ const PLANETS =[
   },
   {
     "systemId": "gamma_pavonis",
-    "name": "Gamma Pavonis 2 (Earthlike)",
+    "name": "New Home (Gamma Pavonis 1)",
     "orbit": 1.1,
-    "lore": "Habitable, no intelligent life — an ideal colony world parked uncomfortably close to the Others' frontier. Colonization waited until after the nova of 2257.",
+    "lore": "A beautiful blue-and-green marble speckled with white clouds, with temperate zones and a full biosphere — no intelligent life. Claude's ideal colony world, but it sat on the Others' frontier, so settlement waited until after the 2257 nova. The colonists later named it New Home.",
     "gravity": 1.0,
     "gravityEst": true,
     "bio": [
@@ -1056,8 +1055,36 @@ const PLANETS =[
       }
     ],
     "facts": [
-      "A perfect colony world — except it sat right on the Others’ frontier, so settlement had to wait for the 2257 nova."
-    ]
+      "Claude described it as a beautiful blue-and-green marble speckled with white clouds.",
+      "It has one large moon and three smaller ones.",
+      "Unusually, the Bobs left it unnamed at first — the human colonists chose the name New Home.",
+      "Claude ran his survey from a VR tropical beach, complete with cabana and deck chair."
+    ],
+    "special": "newhome"
+  },
+  {
+    "systemId": "gamma_pavonis",
+    "name": "New Home — large moon",
+    "orbit": 0.5,
+    "moonOf": "New Home (Gamma Pavonis 1)"
+  },
+  {
+    "systemId": "gamma_pavonis",
+    "name": "New Home — moon II",
+    "orbit": 0.32,
+    "moonOf": "New Home (Gamma Pavonis 1)"
+  },
+  {
+    "systemId": "gamma_pavonis",
+    "name": "New Home — moon III",
+    "orbit": 0.4,
+    "moonOf": "New Home (Gamma Pavonis 1)"
+  },
+  {
+    "systemId": "gamma_pavonis",
+    "name": "New Home — moon IV",
+    "orbit": 0.6,
+    "moonOf": "New Home (Gamma Pavonis 1)"
   },
   {
     "systemId": "jabberwocky",
@@ -1361,11 +1388,11 @@ const ROUTES =
     "from": "Epsilon Eridani",
     "to": "Gamma Pavonis",
     "traveler": "Claude",
-    "dates": "~2190s",
-    "note": "Frontier survey after Mario's reports on the Others. Claude finds an earth-like world with no intelligent life.",
+    "dates": "2205",
+    "note": "Frontier survey after Mario's reports on the Others. Claude finds a blue-green colony world (later New Home) with no intelligent life.",
     "maidenVoyage": true,
-    "startYear": 2190,
-    "endYear": 2202
+    "startYear": 2205,
+    "endYear": 2205
   },
   {
     "from": "Gliese 877",
@@ -2388,10 +2415,11 @@ function spawnPlanets(sys, starPos){
     const isJab=p.special==='jabberwocky';
     const isRoanoke=p.special==='roanoke';
     const isCapital=p.special==='pgfcapital';
+    const isNewHome=p.special==='newhome';
     const isJovian=/jovian/i.test(p.name);
     const isGiant=/^(Jupiter|Saturn|Uranus|Neptune)$/.test(p.name);
     const giantR={Jupiter:0.17,Saturn:0.15,Uranus:0.12,Neptune:0.12}[p.name];
-    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
+    const r=isRag?0.16:isQuilt?0.11:isPoseidon?0.14:(isEden||isOldPav||isCapital||isNewHome)?0.13:isJab?0.14:(isTwin||isRoanoke)?0.12:isGiant?giantR:isJovian?0.15:0.10+Math.random()*0.05;
     const ragT=isRag?ragProgress(parseInt(slider.value)):0;
     const pavHarvested=isOldPav&&parseInt(slider.value)>=2210;
     let map, atmoColor, look;
@@ -2413,6 +2441,9 @@ function spawnPlanets(sys, starPos){
     } else if(isJab){
       map=jabberwockyTexture();
       atmoColor='#c9a06a'; // ash haze
+    } else if(isNewHome){
+      map=planetTexture(p.name,'#1a5a8a','#2e8a48',{blobs:30,caps:true}); // blue-green marble
+      atmoColor='#aee0ff';
     } else if(isRoanoke){
       map=roanokeTexture();
       atmoColor='#9fe0c8';
@@ -2481,10 +2512,10 @@ function spawnPlanets(sys, starPos){
     mesh.add(atmo);
     // cloud shells: Ragnarök condenses over time, Quilt light haze, Poseidon storm weather,
     // Eden lush cover, Old Pav loses its weather after the harvest
-    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital){
+    if(isRag||isQuilt||isPoseidon||isEden||isOldPav||isTwin||isJab||isRoanoke||isCapital||isNewHome){
       const clouds=new THREE.Mesh(new THREE.SphereGeometry(r*1.045,24,24),
         new THREE.MeshLambertMaterial({map:cloudTexture(p.name),transparent:true,
-          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:(pavHarvested?0.06:0.5),
+          opacity:isRag?0.85*ragT:isQuilt?0.45:isPoseidon?0.6:isEden?0.55:isTwin?0.5:isJab?0.7:isRoanoke?0.5:isCapital?0.15:isNewHome?0.6:(pavHarvested?0.06:0.5),
           depthWrite:false}));
       clouds.raycast=()=>{};
       if(isJab) clouds.material.color=new THREE.Color(0x8f8a82); // ash-grey eruption smoke
