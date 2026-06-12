@@ -541,6 +541,7 @@ const SYSTEMS =
     "size_class": "small",
     "threatLevel": "others",
     "novaYear": 2257,
+    "dysonYear": 2177,
     "orbitScale": 1.0
   },
   {
@@ -1667,6 +1668,41 @@ const pickMeshes=[];            // invisible larger hit-spheres
 const starRecords=[];           // {system, group, core, halo, pick}
 const threatZones=[], shipyards=[];
 
+function makeDysonSwarm(starR){
+  // The Others' partial Dyson sphere: collector panels on a golden-spiral shell,
+  // with a missing wedge + scattered gaps so it reads as visibly unfinished.
+  const group=new THREE.Group();
+  const shellR=starR*2.6;
+  const panels=[];
+  const PANEL_COUNT=520;
+  const geo=new THREE.PlaneGeometry(starR*0.16, starR*0.16);
+  const matA=new THREE.MeshBasicMaterial({color:0x1b2630,side:THREE.DoubleSide,transparent:true,opacity:0.92});
+  const matB=new THREE.MeshBasicMaterial({color:0x2a3b44,side:THREE.DoubleSide,transparent:true,opacity:0.95});
+  const rnd=seededRandom(877);
+  for(let i=0;i<PANEL_COUNT;i++){
+    const t=i/PANEL_COUNT;
+    const phi=Math.acos(1-2*t);
+    const theta=Math.PI*(1+Math.sqrt(5))*i;
+    const az=((theta%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    if((az>2.1 && az<4.0) || rnd()<0.12) continue;   // missing construction wedge + holes
+    const x=Math.sin(phi)*Math.cos(theta), y=Math.cos(phi), z=Math.sin(phi)*Math.sin(theta);
+    const m=new THREE.Mesh(geo, rnd()<0.5?matA:matB);
+    m.position.set(x*shellR,y*shellR,z*shellR);
+    m.lookAt(0,0,0);
+    m.raycast=()=>{};
+    group.add(m);
+    panels.push(m);
+  }
+  const shell=new THREE.Mesh(new THREE.SphereGeometry(shellR*1.01,24,24),
+    new THREE.MeshBasicMaterial({color:0x0a1016,transparent:true,opacity:0.12,side:THREE.BackSide,depthWrite:false}));
+  shell.raycast=()=>{}; group.add(shell);
+  const heat=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,color:0xff7a3a,
+    transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false}));
+  heat.scale.setScalar(shellR*3); heat.raycast=()=>{}; group.add(heat);
+  group.visible=false;
+  return {group,panels,heat,shellR};
+}
+
 function makeThreatZone(type, starR){
   const g=new THREE.Group(), R=starR*3.5;
   const col = type==='brazilian' ? 0xb6ff3c : 0xff3355;
@@ -1830,10 +1866,14 @@ SYSTEMS.forEach(sys=>{
   if(sys.threatLevel){
     const z=makeThreatZone(sys.threatLevel,r); group.add(z); threatZones.push({zone:z,system:sys});
   }
+  let dyson=null;
+  if(sys.dysonYear){
+    dyson=makeDysonSwarm(r); group.add(dyson.group);
+  }
 
   starsGroup.add(group);
   starRecords.push({system:sys,group,core,halo,pick,baseHalo:r*7,phase:Math.random()*6.28,
-    baseCore:core.material.color.getHex(),isNova:false,blackHole});
+    baseCore:core.material.color.getHex(),isNova:false,blackHole,dyson});
 });
 
 /* selection reticle — rotating dashed diamond ring */
@@ -2537,10 +2577,17 @@ function openSystem(sys){
   const note=SYSTEM_NOTES[sys.name];
   let noteHTML=note?`<div class="note-callout"><b>${esc(note[0])}:</b> ${esc(note[1])}</div>`:'';
   if(sys.novaYear){
-    const post=parseInt(slider.value)>=sys.novaYear;
-    noteHTML+=`<div class="note-callout"><b>${post?'Nova remnant':'Dyson sphere'}:</b> ${post
-      ?'In 2257 relativistic planetoids detonated the star. Nothing remains, right out to the Oort cloud.'
-      :'The Others are enclosing their star — megastructure construction in progress.'}</div>`;
+    const yr=parseInt(slider.value), post=yr>=sys.novaYear;
+    let body;
+    if(post){
+      body='In 2257 relativistic planetoids detonated the star. Nothing remains, right out to the Oort cloud.';
+    } else if(sys.dysonYear && yr>=sys.dysonYear){
+      const pct=Math.min(100,Math.round((yr-sys.dysonYear)/(sys.novaYear-12-sys.dysonYear)*100));
+      body=`The Others are enclosing their star in a Dyson swarm — a partial shell of collector panels, roughly ${pct}% built, with a whole hemisphere still open.`;
+    } else {
+      body='The Others have claimed this system; megastructure construction has not yet begun.';
+    }
+    noteHTML+=`<div class="note-callout"><b>${post?'Nova remnant':'Dyson swarm'}:</b> ${body}</div>`;
   }
   const discovered=discoveryYears[sys.name];
   const bobs=sys.bobs.filter(b=>b!=='N/A');
@@ -2790,6 +2837,19 @@ function updateTimeline(year){
     rec.halo.material.color.set(nova?0xfff3e0:rec.system.color);
     rec.core.material.color.setHex(nova?0x111111:rec.baseCore);
   });
+  // Others' partial Dyson sphere: appears at dysonYear, fills in over decades, gone after the nova
+  starRecords.forEach(rec=>{
+    if(!rec.dyson) return;
+    const dy=rec.system.dysonYear, nv=rec.system.novaYear||9999;
+    const building = year>=dy && year<nv;
+    rec.dyson.group.visible=building;
+    if(building){
+      const prog=THREE.MathUtils.clamp((year-dy)/(nv-12-dy),0,1); // ~full a bit before the nova
+      const shown=Math.floor(rec.dyson.panels.length*prog);
+      rec.dyson.panels.forEach((m,i)=>{ m.visible=i<shown; });
+      rec.dyson.heat.material.opacity=0.15+0.3*prog; // waste heat grows as collectors multiply
+    }
+  });
   trails.children.forEach(child=>{
     const route=child.userData&&child.userData.route;
     if(!route) return;
@@ -2870,6 +2930,7 @@ function animate(){
 
   // star twinkle
   starRecords.forEach(rec=>{
+    if(rec.dyson && rec.dyson.group.visible) rec.dyson.group.rotation.y+=dt*0.04;
     if(rec.blackHole){
       rec.blackHole.diskMat.uniforms.uTime.value=t;
       // billboard the photon ring + lensing arcs to face the camera
