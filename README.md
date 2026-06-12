@@ -7,9 +7,9 @@ An interactive 3D star map of the **Bobiverse** book series by Dennis E. Taylor 
 ## Features
 
 - **3D tactical starmap** (Three.js) with glow-sprite stars, a light-year grid centred on Sol, projected labels, and a selection reticle
-- **24 systems, 40+ planets & moons, 29 routes** — including book 5 (Jabberwocky, Roanoke, the PGF Capital near Sagittarius A*)
+- **24 systems, 45+ planets & moons, 29 routes** — including book 5 (Jabberwocky, Roanoke, the PGF Capital near Sagittarius A*)
 - **Timeline 2133–2350** with autoplay: watch the Bobnet expand, the Others' crimson routes creep out of GL 877, Old Pav get harvested in 2210, and GL 877 go **nova in 2257**
-- **Living worlds**: 16 special worlds with bespoke surfaces, from terraforming Ragnarok and the lit-up colony worlds to war-scarred Quin and Old Pav, plus the Others' partial Dyson sphere that builds and dies on the timeline
+- **Living worlds**: 19 special worlds with bespoke surfaces, from terraforming Ragnarok and the lit-up colony worlds to war-scarred Quin, the Others' contaminated homeworld, and gas giants like Odin, plus the Others' partial Dyson sphere that builds and dies on the timeline
 - **Click any planet** to fly to it and follow it along its orbit, with a camera-side fill light so the visible hemisphere is always lit
 - Search across systems, planets, and Bobs (diacritic-insensitive); telemetry sidebar with mission logs and jump-to navigation
 
